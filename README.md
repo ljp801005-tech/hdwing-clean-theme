@@ -5,7 +5,7 @@
 全站生效，不需要改站点任何文件，关掉脚本即恢复原样。
 
 - 脚本文件：`hdwing-ssd-theme.user.js`
-- 当前版本：**v2.37.0**
+- 当前版本：**v2.38.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
 - 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
@@ -44,7 +44,7 @@
 打开 `https://hdwing.org/torrents.php`，页面应变成白底蓝条。也可按 `F12` → Console，看到下面这行即为生效：
 
 ```
-[hdchina清爽主题 v2.37] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
+[hdchina清爽主题 v2.38] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
 ```
 
 ---
@@ -187,6 +187,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.35 | 修复分页栏当前页深蓝块与普通页码按钮不在同一水平线的问题——统一两类按钮的 `padding/line-height/vertical-align/font` 盒模型（含 JS 内联样式），基线对齐 |
 | v2.36 | 分页对齐改用强制定高方案：所有页码按钮统一 `height:26px + box-sizing:border-box + line-height:24px + padding:0 9px`，JS 内联样式只写颜色不再塞盒模型（避免内联 `!important` 与白按钮尺寸冲突）；新增 `Shift+D` 诊断：按后在 Console 打印分页区真实 DOM 与每个按钮的计算样式，便于精确排查 |
 | v2.37 | 修复分页"只有当前页该深蓝、其他页被误染蓝"：旧逻辑按文本长度≤10 把前几个短页码全染了。改为只染当前页一个——策略1 认非链接的 `b/strong/span/font`（其他页都是 `<a href>`），策略2 回退认带 `current/active/selected` class 的链接；CSS 也从"无条件染所有 b/strong/span/font"改为只认 JS 打的 `.ssd-pager-current` 标记 |
+| v2.38 | 分页当前页判定改为**按 URL `page` 参数精确计算**：从分页链接样本投票校准起始基数(0/1)与每页条数，推出当前页码段文本，只染文本等于该段的按钮，彻底解决"在 1401–1500 页时 1–100 被误染蓝"；同时统一所有分页按钮字体（13px/同粗细/同字族），消除 `<a>`/`<b>`/`<font>` 原生字体不一致 |
 
 ---
 

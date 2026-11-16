@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.37.0
+// @version      2.38.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -781,49 +781,123 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             el.style.setProperty('border-color', C.navBg, 'important');
             pagerFixed++;
         }
-        var currentEl = null;
-        /* 策略 1（NexusPHP 标准）：当前页是不可点击的标记元素（b/strong/span/font/td），
-         * 其他页都是 <a href> 链接。只认非链接、文本为"数字–数字"的页码。 */
-        var marks = content.querySelectorAll('b, strong, font, span, td');
-        var candidates = [];
-        for (var n = 0; n < marks.length; n++) {
-            var pel = marks[n];
-            if (pel.tagName === 'A' || pel.querySelector('a')) continue;   /* 含链接的不是当前页 */
-            var st = (pel.textContent || '').replace(/\s|\u00a0/g, '');
-            if (!/^\[?\d+[-–]\d+\]?$/.test(st) || st.length > 16) continue;
-            if (!isPagerContext(pel)) continue;
-            candidates.push(pel);
+        function normRangeText(s) {
+            return (s || '').replace(/\s|\u00a0/g, '')
+                            .replace(/[–—―−]/g, '-')
+                            .replace(/[\[\]【】［］]/g, '');
         }
-        /* 取最深层的一个作为当前页（避免父容器 + 子元素重复命中） */
-        for (var q = 0; q < candidates.length; q++) {
-            var deeper = false;
-            for (var r = 0; r < candidates.length; r++) {
-                if (r !== q && candidates[q].contains(candidates[r])) { deeper = true; break; }
+        /* 收集分页区"叶子"按钮：文本为数字段，或是上一页/下一页链接。
+         * 链接内层的 <b>/<font> 一律上提到 <a> 层级，避免内外层重复命中。 */
+        var rawBtns = [];
+        var seenEls = [];
+        var allEls = content.querySelectorAll('a, b, strong, font, span, td');
+        for (var i = 0; i < allEls.length; i++) {
+            var bel = allEls[i];
+            if (!isPagerContext(bel)) continue;
+            var bt = normRangeText(bel.textContent);
+            var isRange = /^\d+-\d+$/.test(bt);
+            var isNav = bel.tagName === 'A' && /(上一页|下一页)/.test(bel.textContent || '');
+            if (!isRange && !isNav) continue;
+            var host = bel;
+            if (bel.closest) { var pa = bel.closest('a'); if (pa && isPagerContext(pa)) host = pa; }
+            var dup = false;
+            for (var j = 0; j < seenEls.length; j++) { if (seenEls[j] === host) { dup = true; break; } }
+            if (dup) continue;
+            seenEls.push(host);
+            rawBtns.push({ el: host, text: normRangeText(host.textContent), isRange: isRange });
+        }
+        /* 剔除容器（如包着按钮的 td），只留最内层按钮 */
+        var pagerBtns = [];
+        for (var k = 0; k < rawBtns.length; k++) {
+            var containerHit = false;
+            for (var k2 = 0; k2 < rawBtns.length; k2++) {
+                if (k2 !== k && rawBtns[k].el.contains(rawBtns[k2].el)) { containerHit = true; break; }
             }
-            if (!deeper) { currentEl = candidates[q]; break; }
+            if (!containerHit) pagerBtns.push(rawBtns[k]);
         }
-        /* 策略 2（回退）：某些主题当前页也是 <a>，但带 current/active/selected class。
-         * 仅当策略 1 没找到时启用，且只取第一个。 */
+        /* 统一所有分页按钮字体（字号/粗细/字族一致），消除 <a>/<b>/<font> 原生差异 */
+        for (var f = 0; f < pagerBtns.length; f++) {
+            pagerBtns[f].el.style.setProperty('font-size', '13px', 'important');
+            pagerBtns[f].el.style.setProperty('font-weight', 'normal', 'important');
+            pagerBtns[f].el.style.setProperty('font-family', 'inherit', 'important');
+        }
+        /* 用 URL 的 page 参数精确推导当前页码段：起始基数(0/1)与每页条数
+         * 由分页链接自身样本投票校准，不依赖任何类名或标签猜测 */
+        var pageParam = null;
+        var mp = location.search.match(/[?&]page=(\d+)/);
+        if (mp) pageParam = parseInt(mp[1], 10);
+        var totalItems = 0;
+        var qpairs = [];
+        for (var p1 = 0; p1 < pagerBtns.length; p1++) {
+            var b1 = pagerBtns[p1];
+            if (!b1.isRange) continue;
+            var seg = b1.text.split('-');
+            var endNum = parseInt(seg[1], 10);
+            if (endNum > totalItems) totalItems = endNum;
+            if (b1.el.tagName === 'A') {
+                var mh = (b1.el.getAttribute('href') || '').match(/[?&]page=(\d+)/);
+                if (mh) qpairs.push({ q: parseInt(mh[1], 10), start: parseInt(seg[0], 10) });
+            }
+        }
+        var step = 100;
+        if (qpairs.length >= 2) {
+            qpairs.sort(function (x, y) { return x.q - y.q; });
+            for (var p2 = 1; p2 < qpairs.length; p2++) {
+                if (qpairs[p2].q === qpairs[p2 - 1].q + 1) {
+                    step = qpairs[p2].start - qpairs[p2 - 1].start;
+                    break;
+                }
+            }
+            if (!(step > 0)) step = 100;
+        }
+        var votes0 = 0, votes1 = 0;
+        for (var p3 = 0; p3 < qpairs.length; p3++) {
+            if (qpairs[p3].start === qpairs[p3].q * step + 1) votes0++;
+            if (qpairs[p3].start === (qpairs[p3].q - 1) * step + 1) votes1++;
+        }
+        var cur = pageParam === null ? 0 : (votes1 > votes0 ? pageParam - 1 : pageParam);
+        if (!(cur > 0)) cur = 0;
+        var expEnd = Math.min(cur * step + step, totalItems || cur * step + step);
+        var expected = (cur * step + 1) + '-' + expEnd;
+        /* 只给文本等于当前页码段的按钮上色：非链接标记优先，链接次之 */
+        var currentEl = null, linkHit = null;
+        for (var p4 = 0; p4 < pagerBtns.length; p4++) {
+            var b4 = pagerBtns[p4];
+            if (!b4.isRange || b4.text !== expected) continue;
+            if (b4.el.tagName !== 'A') { currentEl = b4.el; break; }
+            if (!linkHit) linkHit = b4.el;
+        }
+        if (!currentEl) currentEl = linkHit;
+        /* 兜底 1：带 current/active/selected class 的元素 */
         if (!currentEl) {
             var cls = content.querySelectorAll(
                 'a.current, a.active, a.selected, .current, .active, .selected, .pager-current-link');
             for (var m = 0; m < cls.length; m++) {
-                var cst = (cls[m].textContent || '').replace(/\s|\u00a0/g, '');
-                if (/^\[?\d+[-–]\d+\]?$/.test(cst) && isPagerContext(cls[m])) { currentEl = cls[m]; break; }
+                var cst = normRangeText(cls[m].textContent);
+                if (/^\d+-\d+$/.test(cst) && isPagerContext(cls[m])) { currentEl = cls[m]; break; }
+            }
+        }
+        /* 兜底 2：非链接页码标记中起点最接近当前页的一个（page 参数映射异常时兜住） */
+        if (!currentEl) {
+            var bestDiff = Infinity;
+            for (var p5 = 0; p5 < pagerBtns.length; p5++) {
+                var b5 = pagerBtns[p5];
+                if (!b5.isRange || b5.el.tagName === 'A') continue;
+                var d5 = Math.abs(parseInt(b5.text.split('-')[0], 10) - (cur * step + 1));
+                if (d5 < bestDiff) { bestDiff = d5; currentEl = b5.el; }
             }
         }
         if (currentEl) {
             /* 去掉原生方括号（如 [1-100] → 1-100），只改文本不碰样式 */
             if (/[\[\]【】［］]/.test(currentEl.textContent || '')) {
-                currentEl.textContent = currentEl.textContent.replace(/\s|\u00a0/g, '')
-                                                            .replace(/[\[\]【】［］]/g, '');
+                currentEl.textContent = normRangeText(currentEl.textContent);
             }
             applyPill(currentEl);
         }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.37] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.38] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -965,7 +1039,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.37] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.38] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -1037,7 +1111,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.37.0';
+    var LOCAL_VERSION = '2.38.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
