@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.30.0
+// @version      2.31.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @match        https://hdwing.org/*
@@ -35,6 +35,7 @@
         rowHover:    '#c3d9f2',  // 悬停稍深蓝
         stickyMark:  '#fffdf0',  // 总置顶行（极淡黄）
         freeColor:   '#008000',  // Free 绿字（SSD 式）
+        usernameRed: '#e00000',  // 顶部欢迎行用户名红（HDWinG 原生）
         textMain:    '#000000',
     };
 
@@ -137,6 +138,22 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 .site_logo { filter: none !important; }
 .userinfo, .userinfo p, .userinforb, .userinfort, .userinfort p { color: #444 !important; }
 .userinfo b, .userinfort b { color: #444 !important; }
+/* 顶部欢迎行用户名：恢复 HDWinG 原生红色（只命中页头内指向 userdetails.php 的链接，
+ * 覆盖其内 b/font/span，不影响详情页上传者等其他 userdetails 链接） */
+#site_header a[href*="userdetails.php"],
+.headerbox a[href*="userdetails.php"],
+.userinfo a[href*="userdetails.php"],
+.userinfort a[href*="userdetails.php"],
+#site_header a[href*="userdetails.php"] b,
+.headerbox a[href*="userdetails.php"] b,
+.userinfo a[href*="userdetails.php"] b,
+.userinfort a[href*="userdetails.php"] b,
+#site_header a[href*="userdetails.php"] font,
+.headerbox a[href*="userdetails.php"] font,
+.userinfo a[href*="userdetails.php"] font,
+.userinfort a[href*="userdetails.php"] font {
+    color: ${C.usernameRed} !important;
+}
 .user_box {
     background: #f2f2f2 !important;
     border: 1px #d0d0d0 solid !important;
@@ -524,6 +541,24 @@ ul.menu li.selected a {
 .w1k table tr:hover { background-color: #f0f6fd !important; }
 .w1k td { border: 1px #d5d5d5 solid !important; }
 
+/* ---------- 字幕页 subtitles.php：CSS 常驻压白 ----------
+ * 关键：用 CSS 规则而非 JS 逐行设 inline——规则注入后对所有"现在和未来插入"的行
+ * 自动生效，彻底消除"刷新有插色、再刷又没有"的加载时序竞速。
+ * 悬停淡蓝、表头浅灰一并常驻，不依赖执行次数。 */
+${location.pathname.indexOf('subtitles.php') !== -1 ? `
+html body table tr,
+html body table tr:nth-child(odd),
+html body table tr:nth-child(even),
+html body table td,
+html body table tbody {
+    background-color: #ffffff !important;
+    background-image: none !important;
+}
+html body table tr:hover td { background-color: #f0f6fd !important; }
+html body table td.colhead,
+html body table th { background-color: ${C.headerBg} !important; }
+` : ''}
+
 /* ---------- 公告/杂项 ---------- */
 .cbox, table.torrent_advice, table.torrent_adviceb {
     border: 1px #b8b8b8 solid !important;
@@ -761,16 +796,18 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.30] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.31] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
     }
 
     /* ============================================================
-     * 字幕页 subtitles.php：清除隔行插色
-     * 该页列表用灰蓝斑马纹，颜色家族不在通用灰蓝判定内，
-     * 这里按页面直接把所有数据行压白，表头保留浅灰，悬停极淡蓝
+     * 字幕页 subtitles.php：隔行插色已改由 CSS 常驻规则处理（见 buildCSS），
+     * 不再用 JS 逐行设 inline !important——否则 inline 优先级会盖过 CSS 的
+     * hover 淡蓝，且分批渲染时逐行扫描会漏网（刷新有时有色有时无色）。
+     * 这里只做一件事：把原生加在行/单元格上的"非白 inline 背景"清掉，
+     * 让 CSS 规则能接管；不主动设白色。
      * ========================================================== */
     function fixSubtitles() {
         if (!enabled || location.pathname.indexOf('subtitles.php') === -1) return;
@@ -780,17 +817,17 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             for (var r = 0; r < rows.length; r++) {
                 var tr = rows[r];
                 var head = /colhead/i.test(tr.className || '') || !!tr.querySelector('td.colhead, th');
-                tr.style.setProperty('background-color', head ? C.headerBg : '#ffffff', 'important');
-                tr.style.setProperty('background-image', 'none', 'important');
-                var cells = tr.querySelectorAll('td, th');
+                /* 只清除会干扰压白的原生 inline 背景，不主动上色 */
+                if (tr.style.backgroundColor) {
+                    tr.style.removeProperty('background-color');
+                }
+                if (tr.style.backgroundImage) {
+                    tr.style.removeProperty('background-image');
+                }
+                var cells = tr.querySelectorAll('td');
                 for (var c = 0; c < cells.length; c++) {
-                    var cell = cells[c];
-                    if (cell.tagName === 'TH' || /colhead/i.test(cell.className || '')) {
-                        cell.style.setProperty('background-color', C.headerBg, 'important');
-                    } else {
-                        cell.style.setProperty('background-color', '#ffffff', 'important');
-                        cell.style.setProperty('background-image', 'none', 'important');
-                    }
+                    if (cells[c].style.backgroundColor) cells[c].style.removeProperty('background-color');
+                    if (cells[c].style.backgroundImage) cells[c].style.removeProperty('background-image');
                 }
             }
         }
@@ -899,7 +936,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.30] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.31] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
