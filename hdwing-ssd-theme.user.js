@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.41.0
+// @version      2.42.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -66,18 +66,20 @@
     var fadeIn     = get('fadeIn', '1') === '1';
 
     /* ============================================================
-     * 首帧防闪：脚本一执行就把画布刷白，
-     * 这样无论样式表何时就位，都不会先露出原生灰蓝底
+     * 首帧防闪：脚本一执行就把画布刷白并把内容藏住。
+     * 关键点：用 **行内样式** 直接设在 <html> 上——行内样式优先级最高，
+     * 不依赖我们的样式表是否已解析、也不怕站点样式表后到抢占；
+     * 只要脚本赶在第一帧前执行，就一定看不到原生灰蓝底。
      * ========================================================== */
     try {
         var de = document.documentElement;
         de.style.setProperty('background-color', '#ffffff', 'important');
         de.style.setProperty('color-scheme', 'light', 'important');
-        /* 原主题的底色多数写在行内样式 / bgcolor 属性上，CSS 压不住，
-         * 只能等 JS 的"清白处理"跑完才变白——那已经是第一帧之后了，
-         * 所以会先闪一下旧底色。这里先给 html 打标记把 body 藏起来，
-         * 等首次清白完成后再整页显示：用户看到的是"白 → 完整主题页"。 */
-        if (enabled) de.classList.add('ssd-boot');
+        if (enabled) {
+            de.classList.add('ssd-boot');
+            /* 行内隐藏：与 css 的 html.ssd-boot body{visibility:hidden} 双保险 */
+            de.style.setProperty('visibility', 'hidden', 'important');
+        }
     } catch (e) {}
 
     /* 兜底放行：无论后续哪一步出错，最多 1.2s 后一定显示页面 */
@@ -86,8 +88,13 @@
         if (__revealed) return;
         __revealed = true;
         try { document.documentElement.classList.remove('ssd-boot'); } catch (e) {}
+        try { document.documentElement.style.removeProperty('visibility'); } catch (e) {}
     }
     setTimeout(revealPage, 1200);
+    /* load 兜底：图片等资源加载完还没显示就一定放行 */
+    try {
+        window.addEventListener('load', function () { setTimeout(revealPage, 0); });
+    } catch (e) {}
 
     /* 时间戳（诊断首帧用） */
     var T0 = (window.performance && performance.now) ? performance.now() : Date.now();
@@ -931,7 +938,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.41] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.42] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -1012,13 +1019,15 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.41] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.42] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
         /* 页面已解析完（DOMContentLoaded 那次 boot）：清白处理已跑过，
-         * 等一帧让样式落定后整页显示，用户看不到旧底色 */
+         * 用双 rAF 等"样式落定 → 完成一次绘制"后再显示，
+         * 避免显示瞬间仍是最新一帧还没生效的旧底色 */
         if (document.readyState !== 'loading') {
-            (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(revealPage);
+            var raf = window.requestAnimationFrame || function (f) { setTimeout(f, 16); };
+            raf(function () { raf(revealPage); });
         }
     }
 
@@ -1094,7 +1103,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.41.0';
+    var LOCAL_VERSION = '2.42.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
