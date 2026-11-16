@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.40.0
+// @version      2.41.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -714,8 +714,12 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * ========================================================== */
     function fixOffersAndPager() {
         if (!enabled) return;
-        /* 实测 offers.php 的内容不在 #site_content 里，直接全页面扫描 */
-        var content = document.body;
+        /* 关键兜底：document-start 阶段 document.body 可能还是 null，
+         * 直接对 null 调 querySelectorAll 会抛错，把 boot() 后面的
+         * watchDom / 定时补扫 / 显示页面全部打断——正是"必须刷新才生效"的根因。
+         * 与扩展版保持一致：body 未就绪时退回 documentElement。 */
+        var content = document.body || document.documentElement;
+        if (!content) return;
         /* 种子列表页是超大 DOM（百行×十几列），逐格遍历 textContent 会拖慢首帧，
          * 该页无需投票列/锚点修复，跳过（分页修复仍保留） */
         var isListPage = !!document.querySelector('.torrent_list');
@@ -927,7 +931,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.40] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.41] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -972,23 +976,28 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 且它配合 opacity:0 会让页面先塌再长高——正是"整页抽动"的来源，已删除。 */
 
     function boot() {
-        apply();
-        placeStyle();
-        purgeGrayBands();
-        fixOffersAndPager();
-        fixSubtitles();
+        /* 每一步独立 try/catch：任何一处修复抛错都不能拖垮后续步骤和"显示页面"，
+         * 否则 document-start 阶段一个 null 就会让整轮初始化中断（旧版"必须刷新才生效"的根因） */
+        try { apply(); } catch (e) {}
+        try { placeStyle(); } catch (e) {}
+        try { purgeGrayBands(); } catch (e) {}
+        try { fixOffersAndPager(); } catch (e) {}
+        try { fixSubtitles(); } catch (e) {}
         /* 早期多轮补扫：首帧后立刻把残留灰蓝压掉，避免闪一下 */
         var delays = [16, 60, 150, 320, 700, 1200];
         for (var d = 0; d < delays.length; d++) {
             (function (t) {
                 setTimeout(function () {
-                    purgeGrayBands();
-                    if (t <= 320) { fixOffersAndPager(); fixSubtitles(); }
-                    if (t <= 700) placeStyle();
+                    try { purgeGrayBands(); } catch (e) {}
+                    if (t <= 320) {
+                        try { fixOffersAndPager(); } catch (e) {}
+                        try { fixSubtitles(); } catch (e) {}
+                    }
+                    if (t <= 700) { try { placeStyle(); } catch (e) {} }
                 }, t);
             })(delays[d]);
         }
-        watchDom();
+        try { watchDom(); } catch (e) {}
         /* 每日首次检测更新：延迟执行，不与首帧渲染抢资源 */
         setTimeout(checkUpdateDaily, 1500);
         /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
@@ -1003,7 +1012,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.40] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.41] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
         /* 页面已解析完（DOMContentLoaded 那次 boot）：清白处理已跑过，
@@ -1013,9 +1022,14 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         }
     }
 
-    boot();
+    /* 先注册监听、再跑首轮：顺序不能反——首轮若抛异常，监听就没机会注册了 */
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', boot);
+        document.addEventListener('DOMContentLoaded', function () {
+            try { boot(); } catch (e) {}
+        });
+    }
+    try { boot(); } catch (e) {
+        try { console.warn('[hdchina清爽主题] 首轮初始化异常（已忽略，DOMContentLoaded 会重跑）', e); } catch (e2) {}
     }
 
     /* ============================================================
@@ -1080,7 +1094,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.40.0';
+    var LOCAL_VERSION = '2.41.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');

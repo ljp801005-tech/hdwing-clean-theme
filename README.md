@@ -5,7 +5,7 @@
 全站生效，不需要改站点任何文件，关掉脚本即恢复原样。
 
 - 脚本文件：`hdwing-ssd-theme.user.js`
-- 当前版本：**v2.40.0**
+- 当前版本：**v2.41.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
 - 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
@@ -44,7 +44,7 @@
 打开 `https://hdwing.org/torrents.php`，页面应变成白底蓝条。也可按 `F12` → Console，看到下面这行即为生效：
 
 ```
-[hdchina清爽主题 v2.40] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
+[hdchina清爽主题 v2.41] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
 ```
 
 ---
@@ -190,6 +190,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.38 | 分页当前页判定改为**按 URL `page` 参数精确计算**：从分页链接样本投票校准起始基数(0/1)与每页条数，推出当前页码段文本，只染文本等于该段的按钮，彻底解决"在 1401–1500 页时 1–100 被误染蓝"；同时统一所有分页按钮字体（13px/同粗细/同字族），消除 `<a>`/`<b>`/`<font>` 原生字体不一致 |
 | v2.39 | 修复油猴版刷新/翻页时整页"抽动"：旧的淡入机制用 `opacity:0` 先隐藏种子表、再由 JS 每 80ms 轮询高度加类显示，导致页面先塌成很矮再突然长高。改为与扩展版一致的纯 CSS 动画（表格始终可见，仅 0.35s 淡入）；删除 `waitTableStable` 与 `watchLayout`（后者每 100ms 读 offsetHeight 强制重排）；`apply()` 增加 CSS 内容比对，内容未变不再重写 `<style>`，避免重复解析样式表与重启淡入动画 |
 | v2.40 | 修复切换版面/刷新时"先闪一下原主题底色再变白"：原主题底色多写在行内样式/`bgcolor` 上，CSS 压不住，只能等 JS 清白处理（DOMContentLoaded 后）才白，那已是第一帧之后。改为首帧即给 `<html>` 打 `ssd-boot` 标记、`html.ssd-boot body{visibility:hidden}` 先藏住内容（画布保持纯白），DOMContentLoaded 完成首次清白后一帧再整页显示；另有 1.2s 兜底定时放行，任何异常都不会白屏卡死 |
+| v2.41 | 修复"切换后方必须手动刷新才生效"：`fixOffersAndPager()` 在 document-start 阶段对 `document.body`（此时为 null）调 `querySelectorAll` 抛异常，异常冒泡出 `boot()` 导致**后面注册 DOMContentLoaded 的语句没执行**，页面解析完没人重跑修复。修法=①`content = document.body || document.documentElement` 兜底（与扩展版一致）；②`boot()` 每步独立 try/catch，一处出错不拖垮后续；③**先注册 DOMContentLoaded 再跑首轮**，顺序不再依赖首轮是否抛错 |
 
 ---
 
