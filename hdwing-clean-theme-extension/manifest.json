@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "hdchina清爽主题",
   "version": "2.39.0",
-  "description": "HDWinG 全站清爽主题：白底、蓝色导航、置顶淡蓝行、清晰网格。首帧防闪、样式常驻，比油猴版更稳定。",
+  "description": "HDWinG 全站清爽主题：白底、蓝色导航、置顶淡蓝行、清晰网格。首帧防闪、样式常驻，切换页面不闪烁。",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",

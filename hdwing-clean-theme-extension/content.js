@@ -1,5 +1,5 @@
 /* hdchina清爽主题 · Chrome 扩展版 v2.39.0
- * 迁移自同名油猴脚本，主题 CSS 与 DOM 修复逻辑完全一致。
+ * 由同名油猴脚本形态迁移而来（脚本版自 v2.39 起停止维护，仓库只保留扩展）。
  * 首帧防闪由 manifest 声明的 flash-guard.css 提前注入。
  * GM_* API 在本环境不存在，get/set 会自动走 localStorage 兜底。
  * 菜单由 popup.html 提供（改写页面 localStorage 后刷新）。
@@ -1124,15 +1124,14 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
     } catch (e) {}
 
     /* ============================================================
-     * 自动更新检测（双保险）
-     * 说明：油猴脚本无法自己覆盖安装自己，真正的自动更新由 Tampermonkey
-     * 依据 @updateURL/@downloadURL + 扩展设置里的"检查频率"完成。
-     * 这里额外做一件事：每天第一次打开站点时，主动拉取 raw 脚本头部的
-     * @version，若发现新版本就弹桌面通知并给出"立即更新"菜单，避免
-     * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
+     * 版本更新检测
+     * 说明：本地扩展无法自己安装新版本，这里每天第一次打开站点时
+     * 拉取仓库里扩展 manifest.json 的 version 字段，发现新版就在页面
+     * 右下角弹提示（点击打开仓库），提醒用户手动覆盖文件 + 重新加载。
+     * 检测结果按日期缓存，一天只查一次。
      * ========================================================== */
-    var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.38.0';
+    var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-clean-theme-extension/manifest.json';
+    var LOCAL_VERSION = '2.39.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
@@ -1151,7 +1150,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
     }
 
     function openInstallPage() {
-        try { window.open('https://github.com/ljp801005-tech/hdwing-clean-theme/releases', '_blank'); } catch (e) {}
+        try { window.open('https://github.com/ljp801005-tech/hdwing-clean-theme', '_blank'); } catch (e) {}
     }
 
     /* 扩展版用原生 fetch + 页面内 toast，替代 GM_xmlhttpRequest / GM_notification */
@@ -1179,9 +1178,14 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 .then(function (r) { return r.ok ? r.text() : null; })
                 .then(function (text) {
                     if (!text) return;
-                    var m = text.match(/@version\s+([\d.]+)/);
-                    if (!m) return;
-                    var remote = m[1];
+                    /* 目标文件是 manifest.json（JSON）；若格式变化则回退到 @version 正则 */
+                    var remote = '';
+                    try { remote = (JSON.parse(text) || {}).version || ''; } catch (e) {}
+                    if (!remote) {
+                        var mm = text.match(/@version\s+([\d.]+)/);
+                        if (mm) remote = mm[1];
+                    }
+                    if (!/^\d+(\.\d+)*$/.test(remote)) return;
                     if (cmpVer(remote, LOCAL_VERSION) > 0) {
                         set('updateAvailable', remote);
                         showToast('hdchina清爽主题有新版本 ' + remote + '（当前 ' + LOCAL_VERSION + '），点击查看。', openInstallPage);

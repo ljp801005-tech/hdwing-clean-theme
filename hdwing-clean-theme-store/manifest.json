@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Clean Theme for HDWinG",
-  "version": "2.34.1",
-  "description": "A clean white-and-blue theme for HDWinG with a flicker-free first paint.",
+  "name": "hdchina清爽主题",
+  "version": "2.39.0",
+  "description": "HDWinG 全站清爽主题：白底、蓝色导航、置顶淡蓝行、清晰网格。首帧防闪、样式常驻，切换页面不闪烁。",
   "icons": {
     "16": "icon16.png",
     "32": "icon32.png",

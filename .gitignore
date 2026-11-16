@@ -2,3 +2,6 @@
 .workbuddy/
 *.swp
 node_modules/
+__pycache__/
+*.log
+flash_capture_server.py
