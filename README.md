@@ -5,7 +5,7 @@
 全站生效，不需要改站点任何文件，关掉脚本即恢复原样。
 
 - 脚本文件：`hdwing-ssd-theme.user.js`
-- 当前版本：**v2.42.0**
+- 当前版本：**v2.43.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
 - 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
@@ -44,7 +44,7 @@
 打开 `https://hdwing.org/torrents.php`，页面应变成白底蓝条。也可按 `F12` → Console，看到下面这行即为生效：
 
 ```
-[hdchina清爽主题 v2.42] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
+[hdchina清爽主题 v2.43] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
 ```
 
 ---
@@ -192,6 +192,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.40 | 修复切换版面/刷新时"先闪一下原主题底色再变白"：原主题底色多写在行内样式/`bgcolor` 上，CSS 压不住，只能等 JS 清白处理（DOMContentLoaded 后）才白，那已是第一帧之后。改为首帧即给 `<html>` 打 `ssd-boot` 标记、`html.ssd-boot body{visibility:hidden}` 先藏住内容（画布保持纯白），DOMContentLoaded 完成首次清白后一帧再整页显示；另有 1.2s 兜底定时放行，任何异常都不会白屏卡死 |
 | v2.41 | 修复"切换后方必须手动刷新才生效"：`fixOffersAndPager()` 在 document-start 阶段对 `document.body`（此时为 null）调 `querySelectorAll` 抛异常，异常冒泡出 `boot()` 导致**后面注册 DOMContentLoaded 的语句没执行**，页面解析完没人重跑修复。修法=①`content = document.body || document.documentElement` 兜底（与扩展版一致）；②`boot()` 每步独立 try/catch，一处出错不拖垮后续；③**先注册 DOMContentLoaded 再跑首轮**，顺序不再依赖首轮是否抛错 |
 | v2.42 | 加强首帧防闪：把"藏住页面"从依赖样式表改为**行内样式直接设在 `<html>`**（`visibility:hidden!important`），不依赖主题 CSS 是否已解析、也不怕站点样式表后到抢占；显示时机改为双 `requestAnimationFrame`（等样式落定并完成一次绘制后再放开），另加 `window.load` 兜底放行 |
+| v2.43 | 定位"防闪代码没生效"的两个真凶：①极早期注入时 `document.documentElement`/`head` 可能都还不存在，旧代码在 `de.style` 处静默抛错，**隐藏与样式注入全被跳过**；②`addStyle` 对 null 调 `appendChild` 同样抛错。修法=`hideNow()` 带重试（rAF 连拍最多 300 次）、`addStyle` 返回 false 让 `apply()` 下轮重试、`earlyBootstrap()` 抢在首次绘制前完成"隐藏+注入"；并在显示页面时打印 `readyState / 隐藏是否生效 / first-paint / FCP`，用于判断是否属"油猴注入晚于首帧"的机制极限 |
 
 ---
 

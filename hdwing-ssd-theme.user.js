@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.42.0
+// @version      2.43.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -65,22 +65,43 @@
     var compact    = get('compact', '1') === '1';
     var fadeIn     = get('fadeIn', '1') === '1';
 
+    /* 脚本启动时的文档状态：若已经不是 loading，说明脚本注入晚于首帧，
+     * 那时灰底已经画出来了，任何脚本都来不及——这是关键诊断信息 */
+    var START_READY = document.readyState;
+    var __hidden = false;
     /* ============================================================
      * 首帧防闪：脚本一执行就把画布刷白并把内容藏住。
-     * 关键点：用 **行内样式** 直接设在 <html> 上——行内样式优先级最高，
-     * 不依赖我们的样式表是否已解析、也不怕站点样式表后到抢占；
-     * 只要脚本赶在第一帧前执行，就一定看不到原生灰蓝底。
+     * 用行内样式直接设在 <html> 上——优先级最高，不依赖样式表解析、
+     * 也不怕站点后到的 CSS 抢占。
+     * 注意：documentElement 在某些注入时机下可能还不存在，必须重试，
+     * 否则老代码会在 de.style 处静默抛错，导致"明明有防闪代码却仍然闪"。
      * ========================================================== */
-    try {
+    function hideNow() {
+        if (__hidden || !enabled) return;
         var de = document.documentElement;
-        de.style.setProperty('background-color', '#ffffff', 'important');
-        de.style.setProperty('color-scheme', 'light', 'important');
-        if (enabled) {
+        if (!de || !de.style) return;
+        try {
+            de.style.setProperty('background-color', '#ffffff', 'important');
+            de.style.setProperty('color-scheme', 'light', 'important');
             de.classList.add('ssd-boot');
-            /* 行内隐藏：与 css 的 html.ssd-boot body{visibility:hidden} 双保险 */
             de.style.setProperty('visibility', 'hidden', 'important');
+            __hidden = true;
+        } catch (e) {}
+    }
+    hideNow();
+    /* 极早期接管：documentElement / head 还没就绪时，
+     * 用 rAF 连拍尽快补上"隐藏 + 注入样式"，抢在首次绘制之前 */
+    var hideTries = 0;
+    (function earlyBootstrap() {
+        hideNow();
+        try {
+            if (enabled && !document.getElementById('ssd-theme-style')) apply();
+        } catch (e) {}
+        var ready = __hidden && !!document.getElementById('ssd-theme-style');
+        if (!ready && hideTries++ < 300) {
+            (window.requestAnimationFrame || function (f) { setTimeout(f, 0); })(earlyBootstrap);
         }
-    } catch (e) {}
+    })();
 
     /* 兜底放行：无论后续哪一步出错，最多 1.2s 后一定显示页面 */
     var __revealed = false;
@@ -89,6 +110,17 @@
         __revealed = true;
         try { document.documentElement.classList.remove('ssd-boot'); } catch (e) {}
         try { document.documentElement.style.removeProperty('visibility'); } catch (e) {}
+        /* 一次性诊断：脚本启动时刻 vs 浏览器首次绘制，用来判断是不是"注入太晚" */
+        try {
+            var paints = performance.getEntriesByType ? performance.getEntriesByType('paint') : [];
+            var fp = 0, fcp = 0;
+            for (var pi = 0; pi < paints.length; pi++) {
+                if (paints[pi].name === 'first-paint') fp = Math.round(paints[pi].startTime);
+                if (paints[pi].name === 'first-contentful-paint') fcp = Math.round(paints[pi].startTime);
+            }
+            console.log('[hdchina清爽主题 v2.43] 显示页面 t=' + since() + 'ms | 脚本启动时 readyState='
+                + START_READY + ' | 隐藏生效=' + __hidden + ' | first-paint=' + fp + 'ms | FCP=' + fcp + 'ms');
+        } catch (e) {}
     }
     setTimeout(revealPage, 1200);
     /* load 兜底：图片等资源加载完还没显示就一定放行 */
@@ -119,11 +151,17 @@
     function addStyle(css) {
         var old = document.getElementById('ssd-theme-style');
         if (old) old.remove();
+        /* 极早期注入时 head / documentElement 可能都还没就绪：
+         * 老代码这里直接 appendChild 会抛错，导致样式根本没注入（=灰底闪）
+         * 返回 false 交给 apply() 下轮重试 */
+        var host = document.head || document.documentElement;
+        if (!host) return false;
         var s = document.createElement('style');
         s.id = 'ssd-theme-style';
         s.textContent = css;
-        (document.head || document.documentElement).appendChild(s);
+        host.appendChild(s);
         placeStyle();
+        return true;
     }
 
     function buildCSS() {
@@ -631,8 +669,8 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             if (css !== lastCSS) { st.textContent = css; lastCSS = css; }
             return;
         }
-        addStyle(css);
-        lastCSS = css;
+        /* addStyle 返回 false 表示文档根还没就绪，不记 lastCSS，留给下轮重试 */
+        if (addStyle(css) !== false) lastCSS = css;
     }
 
     /* ============================================================
@@ -938,7 +976,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.42] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.43] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -1019,7 +1057,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.42] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.43] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
         /* 页面已解析完（DOMContentLoaded 那次 boot）：清白处理已跑过，
@@ -1103,7 +1141,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.42.0';
+    var LOCAL_VERSION = '2.43.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
