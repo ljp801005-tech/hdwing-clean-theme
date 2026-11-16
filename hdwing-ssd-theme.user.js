@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.18.0
+// @version      2.19.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区等其他页面同样生效。
 // @author       WorkBuddy
 // @match        https://hdwing.org/*
@@ -559,6 +559,16 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         if (scope === document) whiten(document.body, nav);
     }
 
+    /* 样式表移位的兜底：一旦 body 存在就立刻把样式挂到文档末尾。
+     * 原生 CSS 也是 !important 时，后出现者胜出；在解析阶段完成移位，
+     * 首帧渲染前就生效，不会先画一帧原生灰蓝 */
+    function moveStyleToEnd() {
+        var st = document.getElementById('ssd-theme-style');
+        if (st && document.body && st.parentNode !== document.body) {
+            document.body.appendChild(st);
+        }
+    }
+
     /* 监听后续插入的节点（分页、展开、AJAX 内容），即时清白，
      * 不再等 400ms 定时器，切换页面/翻页都不闪灰蓝 */
     function watchDom() {
@@ -578,6 +588,8 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                     if (added[j].nodeType === 1) queue.push(added[j]);
                 }
             }
+            /* body 刚被解析出来时立刻移位（早于首帧绘制） */
+            moveStyleToEnd();
             if (!scheduled && queue.length) {
                 scheduled = true;
                 (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(flush);
@@ -596,11 +608,14 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         if (!enabled) return;
         /* 实测 offers.php 的内容不在 #site_content 里，直接全页面扫描 */
         var content = document.body;
+        /* 种子列表页是超大 DOM（百行×十几列），逐格遍历 textContent 会拖慢首帧，
+         * 该页无需投票列/锚点修复，跳过（分页修复仍保留） */
+        var isListPage = !!document.querySelector('.torrent_list');
 
         /* 1) 投票列：全站 td 文本匹配，各种横线/等号变体统一归一化 */
         var voteFixed = 0;
         var voteSamples = [];
-        var tds = content.querySelectorAll('td');
+        var tds = isListPage ? [] : content.querySelectorAll('td');
         for (var i = 0; i < tds.length; i++) {
             var raw = tds[i].textContent || '';
             var t = raw.replace(/\s|\u00a0|\u200b/g, '')
@@ -620,7 +635,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 2) 灰色信息盒：找到锚点文字，向上把所有非白底容器压白（含背景图） */
         var grayCleared = 0;
-        var anchors = content.querySelectorAll(
+        var anchors = isListPage ? [] : content.querySelectorAll(
             'td, div, font, b, span, strong, em, p, h1, h2, h3, center, li, a');
         for (var a = 0; a < anchors.length; a++) {
             var at = (anchors[a].textContent || '').trim();
@@ -717,7 +732,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.16] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.19] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -725,6 +740,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
     function boot() {
         apply();
+        moveStyleToEnd();
         purgeGrayBands();
         fixOffersAndPager();
         /* 早期多轮补扫：首帧后立刻把残留灰蓝压掉，避免闪一下 */
@@ -734,14 +750,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 setTimeout(function () {
                     purgeGrayBands();
                     if (t <= 320) fixOffersAndPager();
-                    /* 把样式表移到文档末尾：原生 CSS 后加载时同样能压制
-                     * （相同特异性 + 都是 !important 时，后出现的胜出） */
-                    if (t <= 700) {
-                        var st = document.getElementById('ssd-theme-style');
-                        if (st && document.body && st.parentNode !== document.body) {
-                            document.body.appendChild(st);
-                        }
-                    }
+                    if (t <= 700) moveStyleToEnd();
                 }, t);
             })(delays[d]);
         }

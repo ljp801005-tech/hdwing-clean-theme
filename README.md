@@ -5,7 +5,7 @@
 全站生效，不需要改站点任何文件，关掉脚本即恢复原样。
 
 - 脚本文件：`hdwing-ssd-theme.user.js`
-- 当前版本：**v2.18.0**
+- 当前版本：**v2.19.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
 - 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
@@ -42,7 +42,7 @@
 打开 `https://hdwing.org/torrents.php`，页面应变成白底蓝条。也可按 `F12` → Console，看到下面这行即为生效：
 
 ```
-[hdchina清爽主题 v2.18] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
+[hdchina清爽主题 v2.19] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
 ```
 
 ---
@@ -146,6 +146,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.16 | 灰蓝区间判定；详情页 `.details_box`、论坛 `table.table_forums`、控制面板 `.index_new` 去插色；候选区表头框恢复 |
 | v2.17 | 控制面板左侧菜单（`ul.menu li a`）适配；JS 扫描补充 a/li/span/ul |
 | v2.18 | 消除切换页面闪烁：样式提前注入并移至文档末尾、多轮补扫、`MutationObserver` 实时清理 |
+| v2.19 | 消除种子列表首帧闪灰：解析阶段即把样式移到文档末尾（抢在首帧渲染前）；超大列表页跳过逐格扫描，降低首帧开销 |
 
 ---
 
