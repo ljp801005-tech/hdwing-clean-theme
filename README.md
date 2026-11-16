@@ -193,6 +193,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.41 | 修复"切换后方必须手动刷新才生效"：`fixOffersAndPager()` 在 document-start 阶段对 `document.body`（此时为 null）调 `querySelectorAll` 抛异常，异常冒泡出 `boot()` 导致**后面注册 DOMContentLoaded 的语句没执行**，页面解析完没人重跑修复。修法=①`content = document.body || document.documentElement` 兜底（与扩展版一致）；②`boot()` 每步独立 try/catch，一处出错不拖垮后续；③**先注册 DOMContentLoaded 再跑首轮**，顺序不再依赖首轮是否抛错 |
 | v2.42 | 加强首帧防闪：把"藏住页面"从依赖样式表改为**行内样式直接设在 `<html>`**（`visibility:hidden!important`），不依赖主题 CSS 是否已解析、也不怕站点样式表后到抢占；显示时机改为双 `requestAnimationFrame`（等样式落定并完成一次绘制后再放开），另加 `window.load` 兜底放行 |
 | v2.43 | 定位"防闪代码没生效"的两个真凶：①极早期注入时 `document.documentElement`/`head` 可能都还不存在，旧代码在 `de.style` 处静默抛错，**隐藏与样式注入全被跳过**；②`addStyle` 对 null 调 `appendChild` 同样抛错。修法=`hideNow()` 带重试（rAF 连拍最多 300 次）、`addStyle` 返回 false 让 `apply()` 下轮重试、`earlyBootstrap()` 抢在首次绘制前完成"隐藏+注入"；并在显示页面时打印 `readyState / 隐藏是否生效 / first-paint / FCP`，用于判断是否属"油猴注入晚于首帧"的机制极限 |
+| 扩展 v2.39 | 扩展版健壮性/性能清理（视觉零变化）：①`boot()` 每步独立 try/catch，document_start 阶段任一 null 抛错不再拖垮后续步骤与 `DOMContentLoaded` 注册；②**先注册监听再跑首轮**；③`addStyle()` 对 head/documentElement 未就绪返回 false，由 `apply()` 下轮重试（此前会静默抛错导致样式根本没注入）；④`apply()` 增加 CSS 内容比对，未变不重写 `<style>`（避免重复解析样式表与重启淡入动画）；⑤移除 `watchLayout()`（每 100ms 读 `offsetHeight` 强制重排的开发期诊断代码）；⑥修正控制台版本号一直显示 v2.34 的笔误 |
 
 ---
 

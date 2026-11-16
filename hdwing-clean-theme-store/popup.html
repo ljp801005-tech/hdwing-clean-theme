@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body { width: 260px; margin: 0; padding: 14px 16px 16px; font: 13px/1.5 -apple-system, "Microsoft YaHei", sans-serif; color: #222; }
+  h1 { margin: 0 0 2px; font-size: 15px; font-weight: 600; color: #164a84; }
+  .ver { font-size: 11px; color: #8b8b8b; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid #eef1f4; cursor: pointer; }
+  .row:hover { background: #f7fafd; }
+  .label { flex: 1; }
+  .label small { display: block; color: #8b8b8b; font-size: 11px; }
+  .sw { position: relative; width: 36px; height: 20px; border-radius: 10px; background: #ccc; transition: background .2s; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .sw.on { background: #4a7ab8; }
+  .sw.on::after { left: 18px; }
+  .foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef1f4; font-size: 11px; color: #8b8b8b; line-height: 1.7; }
+  .foot a { color: #1a5eab; text-decoration: none; }
+  .tip { margin-top: 8px; padding: 8px 10px; background: #fff8e6; border: 1px solid #f0dfa8; border-radius: 6px; color: #7a5b00; font-size: 11px; display: none; }
+</style>
+</head>
+<body>
+  <h1>hdchina清爽主题</h1>
+  <div class="ver">扩展版 v2.34.1 · 点击开关后页面自动刷新</div>
+
+  <div class="row" data-key="enabled">
+    <div class="label">主题总开关<small>关闭后恢复 HDWinG 原生界面</small></div>
+    <div class="sw"></div>
+  </div>
+  <div class="row" data-key="compact">
+    <div class="label">紧凑行距<small>种子列表行高</small></div>
+    <div class="sw"></div>
+  </div>
+  <div class="row" data-key="stickyHead">
+    <div class="label">表头吸顶<small>滚动时固定表头（默认关）</small></div>
+    <div class="sw"></div>
+  </div>
+  <div class="row" data-key="fadeIn">
+    <div class="label">淡入防抖<small>消除表格分批加载抖动（默认开）</small></div>
+    <div class="sw"></div>
+  </div>
+
+  <div class="tip" id="tip">当前标签页不是 HDWinG，开关将在下次打开站点时生效。</div>
+  <div class="foot">
+    需在 <a href="#" id="openSite">hdwing.org</a> 页面上使用 · <a href="#" id="openRepo">项目主页</a>
+  </div>
+
+<script src="popup.js"></script>
+</body>
+</html>

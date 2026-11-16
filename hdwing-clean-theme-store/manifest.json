@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Clean Theme for HDWinG",
+  "version": "2.34.1",
+  "description": "A clean white-and-blue theme for HDWinG with a flicker-free first paint.",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": ["scripting", "activeTab", "tabs"],
+  "host_permissions": ["*://hdwing.org/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "hdchina清爽主题 · 设置",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://hdwing.org/*"],
+      "css": ["flash-guard.css"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}

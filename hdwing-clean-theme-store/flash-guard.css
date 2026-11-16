@@ -1,0 +1,41 @@
+/* ============================================================
+ * 首帧防闪守卫（扩展专属增量）
+ * 本文件由 manifest.json 的 content_scripts.css 声明，浏览器会在
+ * "页面 DOM 开始解析之前"注入，远早于任何页面脚本 / 油猴 document-start。
+ * 只放不依赖图片的纯色规则：先把整页刷白、导航条刷蓝，
+ * 这样原生灰蓝底和灰蓝导航永远没有机会被绘制出来。
+ * 完整主题样式仍由 content.js 动态注入（含开关、配色、各页适配）。
+ * ========================================================== */
+
+html, body {
+    background: #ffffff !important;
+    color-scheme: light !important;
+}
+
+#all_box {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+
+/* 页头区域先压白，避免 logo 行露出原生灰蓝横带 */
+.headerbox { background: #ffffff !important; padding: 0 !important; }
+#site_header { background-color: #f5f5f5 !important; padding-bottom: 0 !important; margin-bottom: 0 !important; }
+
+/* 导航条预先刷成 SSD 蓝：这是"先灰后蓝"闪烁的主角 */
+#site_nav {
+    background-color: #4a7ab8 !important;
+    background-image: none !important;
+    padding: 10px 0 0 0 !important;
+    border-bottom: none !important;
+}
+.nav_center, .nav_first, .nav_left, .nav_right {
+    background-color: #4a7ab8 !important;
+    background-image: none !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+.nav_center a, .nav_center a:link, .nav_center a:visited {
+    background: transparent !important;
+    color: #ffffff !important;
+}
