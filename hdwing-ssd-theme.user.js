@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.19.0
+// @version      2.20.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区等其他页面同样生效。
 // @author       WorkBuddy
 // @match        https://hdwing.org/*
@@ -54,6 +54,37 @@
     var enabled    = get('enabled', '1') === '1';
     var stickyHead = get('stickyHead', '0') === '1';
     var compact    = get('compact', '1') === '1';
+    var fixedCols  = get('fixedCols', '1') === '1';
+
+    /* ============================================================
+     * 首帧防闪：脚本一执行就把画布刷白，
+     * 这样无论样式表何时就位，都不会先露出原生灰蓝底
+     * ========================================================== */
+    try {
+        var de = document.documentElement;
+        de.style.setProperty('background-color', '#ffffff', 'important');
+        de.style.setProperty('color-scheme', 'light', 'important');
+    } catch (e) {}
+
+    /* 时间戳（诊断首帧用） */
+    var T0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    function since() {
+        return Math.round(((window.performance && performance.now) ? performance.now() : Date.now()) - T0);
+    }
+
+    /* ============================================================
+     * 样式表落位：始终放在"文档里最后的可用容器"末尾
+     * 原生 CSS 也带 !important 时（同特异性），后出现的胜出；
+     * 每次落位都重新判断容器，因此不依赖执行时机
+     * ========================================================== */
+    function placeStyle() {
+        var st = document.getElementById('ssd-theme-style');
+        if (!st) return false;
+        var target = document.body || document.head;
+        if (!target) return false;
+        if (st.parentNode !== target) target.appendChild(st);
+        return true;
+    }
 
     function addStyle(css) {
         var old = document.getElementById('ssd-theme-style');
@@ -61,9 +92,8 @@
         var s = document.createElement('style');
         s.id = 'ssd-theme-style';
         s.textContent = css;
-        /* document-start 阶段 head 可能还没生成，挂到 documentElement，
-         * 保证样式在首帧渲染前就位，避免"先闪一下原生蓝灰" */
         (document.head || document.documentElement).appendChild(s);
+        placeStyle();
     }
 
     function buildCSS() {
@@ -234,7 +264,24 @@ ${compact ? `
 `}
 
 /* 列宽分配：标题列吃掉剩余空间，数值列压窄（SSD 式紧凑） */
+${fixedCols ? `
+/* 固定列宽：布局一次算定，加载中不再随内容重排列宽（消除标题列跳动） */
+.torrent_list { table-layout: fixed !important; width: 100% !important; }
+.torrent_list tr > *:nth-child(1)  { width: 50px !important; }
+.torrent_list tr > *:nth-child(2)  { width: auto !important; }
+.torrent_list tr > *:nth-child(3)  { width: 34px !important; }
+.torrent_list tr > *:nth-child(4)  { width: 34px !important; }
+.torrent_list tr > *:nth-child(5)  { width: 62px !important; }
+.torrent_list tr > *:nth-child(6)  { width: 72px !important; }
+.torrent_list tr > *:nth-child(7)  { width: 40px !important; }
+.torrent_list tr > *:nth-child(8)  { width: 36px !important; }
+.torrent_list tr > *:nth-child(9)  { width: 40px !important; }
+.torrent_list tr > *:nth-child(10) { width: 70px !important; }
+.torrent_list tr > *:nth-child(11) { width: 40px !important; }
+.torrent_list td.t_name { overflow: hidden !important; }
+` : `
 .torrent_list { table-layout: auto !important; }
+`}
 .torrent_list td.t_name { width: auto !important; min-width: 600px !important; }
 .torrent_list td.t_cat      { width: 50px !important; padding: 2px !important; }
 .torrent_list td.t_comment  { width: 34px !important; padding: 3px 2px !important; }
@@ -559,16 +606,6 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         if (scope === document) whiten(document.body, nav);
     }
 
-    /* 样式表移位的兜底：一旦 body 存在就立刻把样式挂到文档末尾。
-     * 原生 CSS 也是 !important 时，后出现者胜出；在解析阶段完成移位，
-     * 首帧渲染前就生效，不会先画一帧原生灰蓝 */
-    function moveStyleToEnd() {
-        var st = document.getElementById('ssd-theme-style');
-        if (st && document.body && st.parentNode !== document.body) {
-            document.body.appendChild(st);
-        }
-    }
-
     /* 监听后续插入的节点（分页、展开、AJAX 内容），即时清白，
      * 不再等 400ms 定时器，切换页面/翻页都不闪灰蓝 */
     function watchDom() {
@@ -589,7 +626,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 }
             }
             /* body 刚被解析出来时立刻移位（早于首帧绘制） */
-            moveStyleToEnd();
+            placeStyle();
             if (!scheduled && queue.length) {
                 scheduled = true;
                 (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(flush);
@@ -732,7 +769,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.19] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.20] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -740,7 +777,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
     function boot() {
         apply();
-        moveStyleToEnd();
+        placeStyle();
         purgeGrayBands();
         fixOffersAndPager();
         /* 早期多轮补扫：首帧后立刻把残留灰蓝压掉，避免闪一下 */
@@ -750,11 +787,26 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 setTimeout(function () {
                     purgeGrayBands();
                     if (t <= 320) fixOffersAndPager();
-                    if (t <= 700) moveStyleToEnd();
+                    if (t <= 700) placeStyle();
                 }, t);
             })(delays[d]);
         }
         watchDom();
+        /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
+         * 不依赖 DOM 监听回调时机——单页 HTML 可能一次性解析完，回调要到结束才触发 */
+        var pt = setInterval(function () {
+            placeStyle();
+            if (document.readyState === 'complete') clearInterval(pt);
+        }, 8);
+        /* 首帧诊断 */
+        (window.requestAnimationFrame || function (f) { setTimeout(f, 16); })(function () {
+            try {
+                var st = document.getElementById('ssd-theme-style');
+                var pos = st && st.parentNode === document.body ? 'body末尾'
+                        : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
+                console.log('[hdchina清爽主题 v2.20] 首帧 ' + since() + 'ms，样式位置：' + pos);
+            } catch (e) {}
+        });
     }
 
     boot();
@@ -780,6 +832,11 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         GM_registerMenuCommand(stickyHead ? '📌 表头吸顶：开（点击关闭）' : '📌 表头吸顶：关（点击开启）', function () {
             stickyHead = !stickyHead;
             set('stickyHead', stickyHead ? '1' : '0');
+            location.reload();
+        });
+        GM_registerMenuCommand(fixedCols ? '📐 固定列宽：开（点击关闭，列宽随内容自适应）' : '📐 固定列宽：关（点击开启，消除加载时列宽跳动）', function () {
+            fixedCols = !fixedCols;
+            set('fixedCols', fixedCols ? '1' : '0');
             location.reload();
         });
     }
