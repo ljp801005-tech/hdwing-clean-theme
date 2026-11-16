@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.34.0
+// @version      2.35.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -402,30 +402,36 @@ ${compact ? `
 .progressfont { font-size: 10px !important; }
 
 /* ---------- 分页：当前页码做成蓝底白字醒目块 ---------- */
+/* 所有页码按钮统一行盒参数：display/padding/line-height/vertical-align/font 完全一致，
+ * 保证普通按钮与当前页蓝块在同一水平线（此前深蓝块没设 line-height/vertical-align，
+ * 基线比白色 <a> 高出一截，视觉上上下溢出）。 */
 .page_number, .page_prev, .page_next { font-size: 13px !important; }
+.page_number a, .page_prev a, .page_next a,
+.page_number b, .page_number strong,
+.page_number span:not(:has(a)), .page_number font {
+    display: inline-block !important;
+    padding: 2px 7px !important;
+    margin: 0 1px !important;
+    line-height: 18px !important;
+    vertical-align: middle !important;
+    font-size: 13px !important;
+    font-weight: bold !important;
+}
 .page_number a, .page_prev a, .page_next a {
-    display: inline-block;
-    padding: 2px 7px;
-    margin: 0 1px;
     color: ${C.link} !important;
     background: transparent !important;
     border: none !important;
-    font-weight: bold !important;
 }
 .page_number a:hover, .page_prev a:hover, .page_next a:hover {
     background: ${C.stripe} !important;
     text-decoration: none !important;
 }
-/* 当前页码（NexusPHP 通常为 b/strong/font 加粗文本） */
+/* 当前页码（NexusPHP 通常为 b/strong/font 加粗文本）：仅覆盖颜色，盒模型与上面一致 */
 .page_number b, .page_number strong,
 .page_number span:not(:has(a)), .page_number font {
-    display: inline-block !important;
-    padding: 2px 9px !important;
     background: ${C.navBg} !important;
     color: #ffffff !important;
     border-radius: 3px !important;
-    font-weight: bold !important;
-    font-size: 13px !important;
 }
 
 /* ---------- 回顶按钮：圆角蓝底，替换原生丑图 ---------- */
@@ -778,7 +784,11 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             el.style.setProperty('background-color', C.navBg, 'important');
             el.style.setProperty('color', '#ffffff', 'important');
             el.style.setProperty('border-radius', '3px', 'important');
-            el.style.setProperty('padding', '2px 9px', 'important');
+            /* 与样式表完全一致的盒模型，避免内联 !important 覆盖后基线错位 */
+            el.style.setProperty('padding', '2px 7px', 'important');
+            el.style.setProperty('margin', '0 1px', 'important');
+            el.style.setProperty('line-height', '18px', 'important');
+            el.style.setProperty('vertical-align', 'middle', 'important');
             el.style.setProperty('font-weight', 'bold', 'important');
             el.style.setProperty('display', 'inline-block', 'important');
             el.style.setProperty('font-size', '13px', 'important');
@@ -801,7 +811,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.34] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.35] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -943,7 +953,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.34] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.35] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -962,7 +972,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.34.0';
+    var LOCAL_VERSION = '2.35.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
