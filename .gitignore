@@ -1,0 +1,4 @@
+.DS_Store
+.workbuddy/
+*.swp
+node_modules/
