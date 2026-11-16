@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.35.0
+// @version      2.36.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -781,17 +781,11 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             }
         }
         function applyPill(el) {
+            /* 内联只写颜色；盒模型交给样式表（.page_number b/strong/font）统一处理，
+             * 避免内联 !important 与白按钮的盒模型不一致导致高度错位。 */
             el.style.setProperty('background-color', C.navBg, 'important');
             el.style.setProperty('color', '#ffffff', 'important');
-            el.style.setProperty('border-radius', '3px', 'important');
-            /* 与样式表完全一致的盒模型，避免内联 !important 覆盖后基线错位 */
-            el.style.setProperty('padding', '2px 7px', 'important');
-            el.style.setProperty('margin', '0 1px', 'important');
-            el.style.setProperty('line-height', '18px', 'important');
-            el.style.setProperty('vertical-align', 'middle', 'important');
-            el.style.setProperty('font-weight', 'bold', 'important');
-            el.style.setProperty('display', 'inline-block', 'important');
-            el.style.setProperty('font-size', '13px', 'important');
+            el.style.setProperty('border-color', C.navBg, 'important');
             pagerFixed++;
         }
         if (withBr) {
@@ -811,7 +805,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.35] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.36] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -953,7 +947,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.35] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.36] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -964,6 +958,59 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
     }
 
     /* ============================================================
+     * 分页对齐诊断：按 Shift+D 在 Console 打印分页区真实 DOM 结构
+     * 与每个按钮的计算样式，用于精确定位"蓝块与白按钮不齐"的根因。
+     * 只读，不改任何样式。
+     * ========================================================== */
+    function dumpPagerInfo() {
+        var cands = document.querySelectorAll('div, td, p, span, table, nav, center');
+        var row = null;
+        for (var i = 0; i < cands.length; i++) {
+            var t = (cands[i].textContent || '').replace(/\s/g, '');
+            if (t.indexOf('上一页') !== -1 && t.indexOf('下一页') !== -1 && /\d+[-–]\d+/.test(t) && t.length < 120) {
+                if (!row || cands[i].textContent.length < row.textContent.length) row = cands[i];
+            }
+        }
+        console.groupCollapsed('[分页诊断] 容器候选');
+        if (!row) {
+            console.log('未找到分页行容器');
+        } else {
+            console.log('容器:', row.tagName, 'class=', row.className, 'id=', row.id);
+            console.log('outerHTML:', row.outerHTML.slice(0, 3000));
+            var kids = row.querySelectorAll('*');
+            var data = [];
+            for (var k = 0; k < kids.length; k++) {
+                var el = kids[k];
+                if (!el.children.length) {
+                    var cs = getComputedStyle(el);
+                    var txt = (el.textContent || '').trim().slice(0, 20);
+                    if (!txt) continue;
+                    data.push({
+                        tag: el.tagName,
+                        class: el.className,
+                        text: txt,
+                        display: cs.display,
+                        height: cs.height,
+                        lineHeight: cs.lineHeight,
+                        padding: cs.padding,
+                        verticalAlign: cs.verticalAlign,
+                        boxSizing: cs.boxSizing,
+                        bgColor: cs.backgroundColor,
+                        fontSize: cs.fontSize
+                    });
+                }
+            }
+            console.table(data);
+        }
+        console.groupEnd();
+    }
+    try {
+        document.addEventListener('keydown', function (e) {
+            if (e.shiftKey && e.key === 'D') dumpPagerInfo();
+        });
+    } catch (e) {}
+
+    /* ============================================================
      * 自动更新检测（双保险）
      * 说明：油猴脚本无法自己覆盖安装自己，真正的自动更新由 Tampermonkey
      * 依据 @updateURL/@downloadURL + 扩展设置里的"检查频率"完成。
@@ -972,7 +1019,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.35.0';
+    var LOCAL_VERSION = '2.36.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');

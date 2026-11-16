@@ -5,7 +5,7 @@
 全站生效，不需要改站点任何文件，关掉脚本即恢复原样。
 
 - 脚本文件：`hdwing-ssd-theme.user.js`
-- 当前版本：**v2.35.0**
+- 当前版本：**v2.36.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
 - 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
@@ -44,7 +44,7 @@
 打开 `https://hdwing.org/torrents.php`，页面应变成白底蓝条。也可按 `F12` → Console，看到下面这行即为生效：
 
 ```
-[hdchina清爽主题 v2.35] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
+[hdchina清爽主题 v2.36] 投票列修复: … | 灰底清除: … | 标题框恢复: … | 分页修复: …
 ```
 
 ---
@@ -185,6 +185,7 @@ Tampermonkey 菜单点「SSD主题：已启用」→ 关闭，页面刷新即恢
 | v2.33 | 加入自动更新：脚本头声明 `@updateURL` / `@downloadURL`，配合 Tampermonkey 静默更新实现每日自动升级；脚本内置每日首次检测 + 桌面通知 + 「检查更新」菜单 |
 | v2.34 | 所有账号用户名（欢迎行 / 发布者列 / 详情页等）一律恢复 HDWinG 原生字体颜色——全局链接蓝及各处染色规则用 `:not([href*="userdetails.php"])` / `:not(... *)` 排除账号链接及其子元素，不再强制任何颜色 |
 | v2.35 | 修复分页栏当前页深蓝块与普通页码按钮不在同一水平线的问题——统一两类按钮的 `padding/line-height/vertical-align/font` 盒模型（含 JS 内联样式），基线对齐 |
+| v2.36 | 分页对齐改用强制定高方案：所有页码按钮统一 `height:26px + box-sizing:border-box + line-height:24px + padding:0 9px`，JS 内联样式只写颜色不再塞盒模型（避免内联 `!important` 与白按钮尺寸冲突）；新增 `Shift+D` 诊断：按后在 Console 打印分页区真实 DOM 与每个按钮的计算样式，便于精确排查 |
 
 ---
 
