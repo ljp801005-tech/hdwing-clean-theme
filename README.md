@@ -7,6 +7,7 @@
 - 脚本文件：`hdwing-ssd-theme.user.js`
 - 当前版本：**v2.18.0**
 - 适用站点：`https://hdwing.org/*`（http 亦可）
+- 一键安装：[点此安装 / 更新脚本](https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js)（需先装好 Tampermonkey，打开后会自动弹出安装页）
 
 ---
 
