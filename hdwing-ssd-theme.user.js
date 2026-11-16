@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.33.0
+// @version      2.34.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -44,7 +44,6 @@
         rowHover:    '#c3d9f2',  // 悬停稍深蓝
         stickyMark:  '#fffdf0',  // 总置顶行（极淡黄）
         freeColor:   '#008000',  // Free 绿字（SSD 式）
-        usernameRed: '#e00000',  // 顶部欢迎行用户名红（HDWinG 原生）
         textMain:    '#000000',
     };
 
@@ -133,8 +132,12 @@ html, body {
 #site_content { padding: 0 30px !important; }
 
 /* ---------- 链接 ---------- */
-a:link, a:visited, a:active { color: ${C.link} !important; text-decoration: none !important; }
-a:hover { color: ${C.link} !important; text-decoration: underline !important; }
+/* 普通链接用主题蓝；但"用户资料链接"排除在外——HDWinG 原生用内联
+ * <font color> 按用户等级给用户名上色（红/蓝/金等），不能被主题蓝覆盖 */
+a:link:not([href*="userdetails.php"]),
+a:visited:not([href*="userdetails.php"]),
+a:active:not([href*="userdetails.php"]) { color: ${C.link} !important; text-decoration: none !important; }
+a:hover:not([href*="userdetails.php"]) { color: ${C.link} !important; text-decoration: underline !important; }
 
 /* ---------- 顶部用户信息区：只改颜色，不动尺寸定位 ---------- */
 .headerbox { background: ${C.pageBg} !important; }
@@ -146,24 +149,20 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 }
 .site_logo { filter: none !important; }
 .userinfo, .userinfo p, .userinforb, .userinfort, .userinfort p { color: #444 !important; }
-.userinfo b, .userinfort b { color: #444 !important; }
-/* 用户名链接：HDWinG 原生所有指向 userdetails.php 的链接都是红色——
- * 欢迎行、种子列表"发布者"列、详情页上传者、TOP10 等一并恢复，
- * 不被全局链接蓝染色。"匿名"是非链接文字，保持灰色不受影响。 */
-a[href*="userdetails.php"]:link,
-a[href*="userdetails.php"]:visited,
-a[href*="userdetails.php"]:active,
-a[href*="userdetails.php"] b,
-a[href*="userdetails.php"] font {
-    color: ${C.usernameRed} !important;
-}
+/* 账号名保留原生 <font color>（按用户等级着色）：b 标签若属于 userdetails 链接，
+ * 不能被下面的 #444 覆盖，否则会吃掉原生字体色 */
+.userinfo b:not(a[href*="userdetails.php"] *),
+.userinfort b:not(a[href*="userdetails.php"] *) { color: #444 !important; }
+/* 用户名链接一律保留 HDWinG 原生颜色（内联 <font color> 按等级着色），
+ * 全局链接规则已用 :not([href*="userdetails.php"]) 排除，这里不再强制染色。 */
 .user_box {
     background: #f2f2f2 !important;
     border: 1px #d0d0d0 solid !important;
     border-radius: 3px !important;
     color: #333 !important;
 }
-.user_box a { color: ${C.link} !important; }
+/* user_box 内的账号链接保留原生字体色，不染主题蓝 */
+.user_box a:not([href*="userdetails.php"]) { color: ${C.link} !important; }
 .user_info { border-color: #d0d0d0 !important; }
 
 /* ---------- 顶部功能按钮（捐赠/签到/21点/菠萝）：白底圆角胶囊 ---------- */
@@ -395,12 +394,9 @@ ${compact ? `
     background-color: transparent !important;
 }
 .torrent_list td.t_comment a, .torrent_list td.t_file a { color: ${C.link} !important; }
-/* 发布者列用户名：红色（覆盖 td 的 #444 继承）。"匿名"非链接，保持 td 灰 */
-.torrent_list td.t_uploader a[href*="userdetails.php"],
-.torrent_list td.t_uploader a[href*="userdetails.php"]:link,
-.torrent_list td.t_uploader a[href*="userdetails.php"]:visited {
-    color: ${C.usernameRed} !important;
-}
+/* 发布者列账号名：本主题所有规则都不命中 userdetails 链接及其内部 font/b，
+ * 让 HDWinG 原生 <font color>（按用户等级着色）自然生效。
+ * "匿名"等非账号文字无 font color，走 td 的 #444 继承。 */
 
 /* 进度条保留但瘦身 */
 .progressfont { font-size: 10px !important; }
@@ -805,7 +801,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.33] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.34] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -947,7 +943,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.33] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.34] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -966,7 +962,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.33.0';
+    var LOCAL_VERSION = '2.34.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
