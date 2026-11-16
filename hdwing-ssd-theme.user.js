@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.20.0
+// @version      2.21.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区等其他页面同样生效。
 // @author       WorkBuddy
 // @match        https://hdwing.org/*
@@ -54,7 +54,6 @@
     var enabled    = get('enabled', '1') === '1';
     var stickyHead = get('stickyHead', '0') === '1';
     var compact    = get('compact', '1') === '1';
-    var fixedCols  = get('fixedCols', '1') === '1';
 
     /* ============================================================
      * 首帧防闪：脚本一执行就把画布刷白，
@@ -264,54 +263,7 @@ ${compact ? `
 `}
 
 /* 列宽分配：标题列吃掉剩余空间，数值列压窄（SSD 式紧凑） */
-${fixedCols ? `
-/* 固定列宽：布局一次算定，加载中不再随内容重排列宽（消除标题列跳动） */
-.torrent_list { table-layout: fixed !important; width: 100% !important; }
-.torrent_list tr > *:nth-child(1)  { width: 50px !important; }
-.torrent_list tr > *:nth-child(2)  { width: auto !important; }
-.torrent_list tr > *:nth-child(3)  { width: 34px !important; }
-.torrent_list tr > *:nth-child(4)  { width: 34px !important; }
-.torrent_list tr > *:nth-child(5)  { width: 62px !important; }
-.torrent_list tr > *:nth-child(6)  { width: 72px !important; }
-.torrent_list tr > *:nth-child(7)  { width: 40px !important; }
-.torrent_list tr > *:nth-child(8)  { width: 36px !important; }
-.torrent_list tr > *:nth-child(9)  { width: 40px !important; }
-.torrent_list tr > *:nth-child(10) { width: 70px !important; }
-.torrent_list tr > *:nth-child(11) { width: 40px !important; }
-.torrent_list td.t_name { overflow: hidden !important; }
-` : `
 .torrent_list { table-layout: auto !important; }
-`}
-.torrent_list td.t_name { width: auto !important; min-width: 600px !important; }
-.torrent_list td.t_cat      { width: 50px !important; padding: 2px !important; }
-.torrent_list td.t_comment  { width: 34px !important; padding: 3px 2px !important; }
-.torrent_list td.t_file     { width: 34px !important; padding: 3px 2px !important; }
-.torrent_list td.t_time     { width: 62px !important; padding: 3px 2px !important; font-size: 11px !important; }
-.torrent_list td.t_size     { width: 72px !important; padding: 3px 2px !important; font-size: 11px !important; }
-.torrent_list td.t_torrents { width: 34px !important; padding: 3px 2px !important; }
-.torrent_list td.t_leech    { width: 30px !important; padding: 3px 2px !important; }
-.torrent_list td.t_completed{ width: 34px !important; padding: 3px 2px !important; }
-.torrent_list td.t_uploader { width: 70px !important; padding: 3px 2px !important; }
-.torrent_list td.t_manage   { width: 40px !important; padding: 3px 2px !important; }
-
-/* 表头：浅灰，普通文字（SSD 式） */
-.torrent_list tr.tab_header,
-.torrent_list th,
-.torrent_list tr.tab_header td {
-    background: ${C.headerBg} !important;
-    background-image: none !important;
-    color: ${C.headerText} !important;
-    font-weight: bold !important;
-    border-bottom: 1px #b8b8b8 solid !important;
-}
-.torrent_list tr.tab_header a, .torrent_list th a { color: ${C.headerText} !important; }
-.torrent_list th.check { background: ${C.headerBg} !important; }
-${stickyHead ? `
-.torrent_list th {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 8 !important;
-}` : ''}
 
 /* 关键：压掉 HDWinG 原生促销底，行底色只由"是否置顶"决定 */
 .torrent_list tr.free_bg,
@@ -769,9 +721,42 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.20] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.21] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
+        } catch (e) {}
+    }
+
+    /* ============================================================
+     * 布局观察器（自动诊断"收缩又展开"）：
+     * 页头/搜索箱/表格容器的高度在加载中发生变化时，Console 直接打印
+     * 是哪个元素从多少 px 变到多少 px，一锤定音找出塌陷元凶
+     * ========================================================== */
+    function watchLayout() {
+        try {
+            var targets = [];
+            var hb = document.querySelector('.headerbox');
+            if (hb) targets.push(['页头.headerbox', hb]);
+            var sb = document.querySelector('.searchbox');
+            if (sb) targets.push(['搜索箱.searchbox', sb]);
+            var tl = document.querySelector('.torrent_list');
+            if (tl) targets.push(['种子表.torrent_list', tl]);
+            if (!targets.length) return;
+            var last = targets.map(function (t) { return t[1].offsetHeight; });
+            var iv = setInterval(function () {
+                var changed = false;
+                var msg = '[hdchina清爽主题] 高度变化:';
+                for (var i = 0; i < targets.length; i++) {
+                    var h = targets[i][1].offsetHeight;
+                    if (h !== last[i]) {
+                        msg += ' [' + targets[i][0] + ' ' + last[i] + '→' + h + 'px]';
+                        last[i] = h;
+                        changed = true;
+                    }
+                }
+                if (changed) console.log(msg, 'T+' + since() + 'ms');
+                if (document.readyState === 'complete' && since() > 4000) clearInterval(iv);
+            }, 100);
         } catch (e) {}
     }
 
@@ -792,6 +777,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             })(delays[d]);
         }
         watchDom();
+        watchLayout();
         /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
          * 不依赖 DOM 监听回调时机——单页 HTML 可能一次性解析完，回调要到结束才触发 */
         var pt = setInterval(function () {
@@ -804,7 +790,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.20] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.21] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -832,11 +818,6 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         GM_registerMenuCommand(stickyHead ? '📌 表头吸顶：开（点击关闭）' : '📌 表头吸顶：关（点击开启）', function () {
             stickyHead = !stickyHead;
             set('stickyHead', stickyHead ? '1' : '0');
-            location.reload();
-        });
-        GM_registerMenuCommand(fixedCols ? '📐 固定列宽：开（点击关闭，列宽随内容自适应）' : '📐 固定列宽：关（点击开启，消除加载时列宽跳动）', function () {
-            fixedCols = !fixedCols;
-            set('fixedCols', fixedCols ? '1' : '0');
             location.reload();
         });
     }
