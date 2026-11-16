@@ -1,15 +1,24 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.32.0
+// @version      2.33.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
+// @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
+// @supportURL    https://github.com/ljp801005-tech/hdwing-clean-theme/issues
+// @updateURL     https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js
+// @downloadURL   https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js
 // @match        https://hdwing.org/*
 // @match        http://hdwing.org/*
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
+// @grant        GM_notification
+// @grant        GM_info
+// @connect      raw.githubusercontent.com
+// @connect      githubusercontent.com
 // @run-at       document-start
 // ==/UserScript==
 
@@ -796,7 +805,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.32] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.33] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -924,6 +933,8 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         watchDom();
         watchLayout();
         if (fadeIn) waitTableStable();
+        /* 每日首次检测更新：延迟执行，不与首帧渲染抢资源 */
+        setTimeout(checkUpdateDaily, 1500);
         /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
          * 不依赖 DOM 监听回调时机——单页 HTML 可能一次性解析完，回调要到结束才触发 */
         var pt = setInterval(function () {
@@ -936,7 +947,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.32] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.33] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -944,6 +955,84 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
     boot();
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);
+    }
+
+    /* ============================================================
+     * 自动更新检测（双保险）
+     * 说明：油猴脚本无法自己覆盖安装自己，真正的自动更新由 Tampermonkey
+     * 依据 @updateURL/@downloadURL + 扩展设置里的"检查频率"完成。
+     * 这里额外做一件事：每天第一次打开站点时，主动拉取 raw 脚本头部的
+     * @version，若发现新版本就弹桌面通知并给出"立即更新"菜单，避免
+     * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
+     * ========================================================== */
+    var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
+    var LOCAL_VERSION = '2.33.0';
+
+    function cmpVer(a, b) {
+        var x = String(a).split('.'), y = String(b).split('.');
+        var n = Math.max(x.length, y.length);
+        for (var i = 0; i < n; i++) {
+            var xi = parseInt(x[i], 10) || 0, yi = parseInt(y[i], 10) || 0;
+            if (xi > yi) return 1;
+            if (xi < yi) return -1;
+        }
+        return 0;
+    }
+
+    function todayStr() {
+        var d = new Date();
+        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    }
+
+    function openInstallPage() {
+        var u = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
+        try { window.open(u, '_blank'); } catch (e) { location.href = u; }
+    }
+
+    function checkUpdateDaily() {
+        if (typeof GM_xmlhttpRequest !== 'function') return;
+        var today = todayStr();
+        if (get('lastUpdateCheck', '') === today) return;   /* 今天已查过 */
+        set('lastUpdateCheck', today);                       /* 先标记，避免并发重复 */
+        try {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: UPDATE_URL + '?nocache=' + Date.now(),
+                timeout: 8000,
+                headers: { 'Cache-Control': 'no-cache' },
+                onload: function (res) {
+                    try {
+                        if (!res || res.status !== 200 || !res.responseText) return;
+                        var m = res.responseText.match(/@version\s+([\d.]+)/);
+                        if (!m) return;
+                        var remote = m[1];
+                        if (cmpVer(remote, LOCAL_VERSION) > 0) {
+                            set('updateAvailable', remote);
+                            var msg = 'hdchina清爽主题有新版本 ' + remote +
+                                      '（当前 ' + LOCAL_VERSION + '）。点此打开更新页。';
+                            try {
+                                if (typeof GM_notification === 'function') {
+                                    GM_notification({
+                                        title: 'hdchina清爽主题 · 发现新版本',
+                                        text: msg,
+                                        timeout: 15000,
+                                        onclick: openInstallPage
+                                    });
+                                } else {
+                                    console.log('[hdchina清爽主题] ' + msg);
+                                }
+                            } catch (e) {
+                                console.log('[hdchina清爽主题] ' + msg);
+                            }
+                        } else {
+                            set('updateAvailable', '');
+                        }
+                    } catch (e) {}
+                },
+                onerror: function () {},
+                ontimeout: function () {}
+            });
+        } catch (e) {}
     }
 
     /* ============================================================
@@ -971,6 +1060,16 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             set('fadeIn', fadeIn ? '1' : '0');
             location.reload();
         });
+        GM_registerMenuCommand('🔄 检查脚本更新（立即）', function () {
+            set('lastUpdateCheck', '');   /* 清掉今日缓存，强制检查 */
+            checkUpdateDaily();
+        });
+        var avail = get('updateAvailable', '');
+        if (avail) {
+            GM_registerMenuCommand('⬆ 有新版本 ' + avail + ' · 点击更新', function () {
+                openInstallPage();
+            });
+        }
     }
     registerMenu();
 })();
