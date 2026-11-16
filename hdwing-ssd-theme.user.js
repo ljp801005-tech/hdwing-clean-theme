@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.38.0
+// @version      2.39.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -110,10 +110,12 @@
 /* ===== HDWinG SSD主题 v2.0（按SSD真实界面重写） ===== */
 
 ${fadeIn ? `
-/* 渐进渲染淡入：种子行分批到达时先隐藏整个表格，等稳定后一次性淡入，
- * 避免"表格从2697px长到6776px、下方内容被一次次顶下去"的生长抖动 */
-.torrent_list { opacity: 0 !important; }
-body.ssd-table-ready .torrent_list { opacity: 1 !important; transition: opacity .28s ease !important; }
+/* 渐进渲染淡入（与扩展版一致的安全写法）：表格始终可见，只用一次短促的
+ * CSS 动画做淡入，不依赖任何 JS 加类。
+ * 旧写法是 opacity:0 + 等 JS 判断稳定后加类显示——那会让页面先塌成很矮、
+ * 再突然长高，刷新/翻页时整页"抽动"。动画即使不生效，表格也保持原生可见。 */
+@keyframes ssdReveal { from { opacity: .35; } to { opacity: 1; } }
+.torrent_list { animation: ssdReveal .35s ease both !important; }
 ` : ''}
 
 /* ---------- 全局：白底 ---------- */
@@ -590,12 +592,19 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 `;
     }
 
+    var lastCSS = '';
     function apply() {
         var st = document.getElementById('ssd-theme-style');
-        if (!enabled) { if (st && st.parentNode) st.parentNode.removeChild(st); return; }
-        /* 已存在则只更新内容，不重新插入——保持它在文档末尾的优先级 */
-        if (st) { st.textContent = buildCSS(); return; }
-        addStyle(buildCSS());
+        if (!enabled) { if (st && st.parentNode) st.parentNode.removeChild(st); lastCSS = ''; return; }
+        var css = buildCSS();
+        /* CSS 与上次完全相同就什么都不做：重复写 textContent 会让浏览器重新解析
+         * 整张样式表、并重启淡入动画（刷新时页面二次闪一下），是抽动的来源之一 */
+        if (st) {
+            if (css !== lastCSS) { st.textContent = css; lastCSS = css; }
+            return;
+        }
+        addStyle(css);
+        lastCSS = css;
     }
 
     /* ============================================================
@@ -897,7 +906,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.38] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.39] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -934,76 +943,12 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         }
     }
 
-    /* ============================================================
-     * 布局观察器（自动诊断"收缩又展开"）：
-     * 页头/搜索箱/表格容器的高度在加载中发生变化时，Console 直接打印
-     * 是哪个元素从多少 px 变到多少 px，一锤定音找出塌陷元凶
-     * ========================================================== */
-    function watchLayout() {
-        try {
-            var targets = [];
-            var hb = document.querySelector('.headerbox');
-            if (hb) targets.push(['页头.headerbox', hb]);
-            var sb = document.querySelector('.searchbox');
-            if (sb) targets.push(['搜索箱.searchbox', sb]);
-            var tl = document.querySelector('.torrent_list');
-            if (tl) targets.push(['种子表.torrent_list', tl]);
-            if (!targets.length) return;
-            var last = targets.map(function (t) { return t[1].offsetHeight; });
-            var iv = setInterval(function () {
-                var changed = false;
-                var msg = '[hdchina清爽主题] 高度变化:';
-                for (var i = 0; i < targets.length; i++) {
-                    var h = targets[i][1].offsetHeight;
-                    if (h !== last[i]) {
-                        msg += ' [' + targets[i][0] + ' ' + last[i] + '→' + h + 'px]';
-                        last[i] = h;
-                        changed = true;
-                    }
-                }
-                if (changed) console.log(msg, 'T+' + since() + 'ms');
-                if (document.readyState === 'complete' && since() > 4000) clearInterval(iv);
-            }, 100);
-        } catch (e) {}
-    }
+    /* 原 watchLayout 布局观察器已删除：它每 100ms 读一次 offsetHeight（强制重排），
+     * 加载期本身就会让页面抖动，属于开发期诊断代码，不该常驻运行。 */
 
-    /* 渐进渲染淡入：等种子表行数连续多轮不再增长，且表格高度稳定后，
-     * 才给 body 加 class 让表格淡入。用户看到的是一次性出现的完整表格，
-     * 而不是分批生长、下方内容被顶下去的抖动。
-     * 仅在种子列表页启用；有超时兜底，绝不无限隐藏。 */
-    function waitTableStable() {
-        if (location.pathname.indexOf('torrents.php') === -1) {
-            document.body && document.body.classList.add('ssd-table-ready');
-            return;
-        }
-        var stableCount = 0;
-        var lastRows = -1;
-        var lastH = -1;
-        var startAt = Date.now();
-        var iv = setInterval(function () {
-            var tbl = document.querySelector('.torrent_list');
-            var done = false;
-            if (!tbl) {
-                /* 表格还没出现：等，但 1.5s 后无论如何放行 */
-                if (Date.now() - startAt > 1500) done = true;
-            } else {
-                var rows = tbl.querySelectorAll('tbody tr').length;
-                var h = tbl.offsetHeight;
-                if (rows === lastRows && h === lastH && rows > 0) stableCount++;
-                else stableCount = 0;
-                lastRows = rows;
-                lastH = h;
-                /* 连续 3 轮（约 240ms）稳定，或页面 complete 后行稳定 2 轮，或硬超时 3s */
-                if (stableCount >= 3 ||
-                    (document.readyState === 'complete' && stableCount >= 2) ||
-                    Date.now() - startAt > 3000) done = true;
-            }
-            if (done) {
-                clearInterval(iv);
-                document.body && document.body.classList.add('ssd-table-ready');
-            }
-        }, 80);
-    }
+    /* 淡入改由 CSS 动画完成（见 buildCSS），不再需要 JS 轮询表格高度加类。
+     * 旧的 waitTableStable 会每 80ms 读一次 offsetHeight（强制重排），
+     * 且它配合 opacity:0 会让页面先塌再长高——正是"整页抽动"的来源，已删除。 */
 
     function boot() {
         apply();
@@ -1023,8 +968,6 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             })(delays[d]);
         }
         watchDom();
-        watchLayout();
-        if (fadeIn) waitTableStable();
         /* 每日首次检测更新：延迟执行，不与首帧渲染抢资源 */
         setTimeout(checkUpdateDaily, 1500);
         /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
@@ -1039,7 +982,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.38] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.39] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -1111,7 +1054,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.38.0';
+    var LOCAL_VERSION = '2.39.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
