@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.36.0
+// @version      2.37.0
 // @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @homepageURL   https://github.com/ljp801005-tech/hdwing-clean-theme
@@ -401,37 +401,40 @@ ${compact ? `
 /* 进度条保留但瘦身 */
 .progressfont { font-size: 10px !important; }
 
-/* ---------- 分页：当前页码做成蓝底白字醒目块 ---------- */
-/* 所有页码按钮统一行盒参数：display/padding/line-height/vertical-align/font 完全一致，
- * 保证普通按钮与当前页蓝块在同一水平线（此前深蓝块没设 line-height/vertical-align，
- * 基线比白色 <a> 高出一截，视觉上上下溢出）。 */
-.page_number, .page_prev, .page_next { font-size: 13px !important; }
+/* ---------- 分页：所有按钮强制统一定高，确保同一水平线 ----------
+ * 用固定 height + border-box + 统一 line-height，彻底消除深蓝块与白色按钮的高度差。
+ * 不再依赖基线/原生盒模型——此前深蓝块被 JS 内联样式撑高、上下溢出格子。 */
+.page_number, .page_prev, .page_next { font-size: 13px !important; line-height: 1 !important; }
 .page_number a, .page_prev a, .page_next a,
-.page_number b, .page_number strong,
-.page_number span:not(:has(a)), .page_number font {
+.page_number b, .page_number strong, .page_number font,
+.page_number span, .page_number td {
     display: inline-block !important;
-    padding: 2px 7px !important;
+    box-sizing: border-box !important;
+    height: 26px !important;
+    line-height: 24px !important;
+    padding: 0 9px !important;
     margin: 0 1px !important;
-    line-height: 18px !important;
     vertical-align: middle !important;
     font-size: 13px !important;
     font-weight: bold !important;
+    border: 1px solid #d0d7de !important;
+    border-radius: 3px !important;
+    text-decoration: none !important;
 }
 .page_number a, .page_prev a, .page_next a {
     color: ${C.link} !important;
     background: transparent !important;
-    border: none !important;
 }
 .page_number a:hover, .page_prev a:hover, .page_next a:hover {
     background: ${C.stripe} !important;
-    text-decoration: none !important;
 }
-/* 当前页码（NexusPHP 通常为 b/strong/font 加粗文本）：仅覆盖颜色，盒模型与上面一致 */
-.page_number b, .page_number strong,
-.page_number span:not(:has(a)), .page_number font {
+/* 当前页码：只认 JS 精确识别后打的 .ssd-pager-current 标记，
+ * 不再无条件染所有 b/strong/span/font（那会把其他页也染蓝）。
+ * 盒模型与上面完全相同，仅覆盖颜色。 */
+.page_number .ssd-pager-current, .page_prev .ssd-pager-current, .page_next .ssd-pager-current {
     background: ${C.navBg} !important;
     color: #ffffff !important;
-    border-radius: 3px !important;
+    border-color: ${C.navBg} !important;
 }
 
 /* ---------- 回顶按钮：圆角蓝底，替换原生丑图 ---------- */
@@ -763,49 +766,64 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             }
         }
 
-        /* 3) 分页当前页：带括号优先，选中"最深"的匹配元素上色 */
+        /* 3) 分页当前页：只染当前页一个，其他页保持白底蓝字 */
         var pagerFixed = 0;
-        var pagerEls = content.querySelectorAll('b, strong, font, span, a, td');
-        var withBr = null, noBr = [];
-        for (var n = 0; n < pagerEls.length; n++) {
-            var pel = pagerEls[n];
-            var st = (pel.textContent || '').replace(/\s|\u00a0/g, '');
-            if (!/^\[?\d+[-–]\d+\]?$/.test(st) || st.length > 10) continue;
-            /* 必须在"上一页/下一页"附近，避免误伤正文数字 */
-            var ctx = pel.closest('tr, p, div, td') || pel.parentElement;
-            if (!ctx || (ctx.textContent || '').indexOf('上一页') === -1) continue;
-            if (st.indexOf('[') !== -1 || st.indexOf('［') !== -1 || st.indexOf('【') !== -1) {
-                if (!withBr || st.length < withBr._len) { withBr = pel; withBr._len = st.length; }
-            } else {
-                noBr.push(pel);
-            }
+        function isPagerContext(el) {
+            var ctx = el.closest('tr, p, div, td, center') || el.parentElement;
+            return !!ctx && (ctx.textContent || '').indexOf('上一页') !== -1;
         }
         function applyPill(el) {
-            /* 内联只写颜色；盒模型交给样式表（.page_number b/strong/font）统一处理，
-             * 避免内联 !important 与白按钮的盒模型不一致导致高度错位。 */
+            /* 打当前页标记（CSS 靠 .ssd-pager-current 上色），内联颜色作双保险。
+             * 盒模型交给样式表统一处理，内联不碰尺寸。 */
+            try { el.classList.add('ssd-pager-current'); } catch (e) {}
             el.style.setProperty('background-color', C.navBg, 'important');
             el.style.setProperty('color', '#ffffff', 'important');
             el.style.setProperty('border-color', C.navBg, 'important');
             pagerFixed++;
         }
-        if (withBr) {
-            /* 带括号的元素：整体重写文本（去括号），样式上它自己 */
-            withBr.textContent = withBr.textContent.replace(/\s|\u00a0/g, '').replace(/[\[\]【】［］]/g, '');
-            applyPill(withBr);
-        } else {
-            for (var q = 0; q < noBr.length; q++) {
-                /* 无括号版本：只取最深层的（没有匹配后代） */
-                var hasDeeper = false;
-                for (var r = 0; r < noBr.length; r++) {
-                    if (r !== q && noBr[q].contains(noBr[r])) { hasDeeper = true; break; }
-                }
-                if (!hasDeeper) applyPill(noBr[q]);
+        var currentEl = null;
+        /* 策略 1（NexusPHP 标准）：当前页是不可点击的标记元素（b/strong/span/font/td），
+         * 其他页都是 <a href> 链接。只认非链接、文本为"数字–数字"的页码。 */
+        var marks = content.querySelectorAll('b, strong, font, span, td');
+        var candidates = [];
+        for (var n = 0; n < marks.length; n++) {
+            var pel = marks[n];
+            if (pel.tagName === 'A' || pel.querySelector('a')) continue;   /* 含链接的不是当前页 */
+            var st = (pel.textContent || '').replace(/\s|\u00a0/g, '');
+            if (!/^\[?\d+[-–]\d+\]?$/.test(st) || st.length > 16) continue;
+            if (!isPagerContext(pel)) continue;
+            candidates.push(pel);
+        }
+        /* 取最深层的一个作为当前页（避免父容器 + 子元素重复命中） */
+        for (var q = 0; q < candidates.length; q++) {
+            var deeper = false;
+            for (var r = 0; r < candidates.length; r++) {
+                if (r !== q && candidates[q].contains(candidates[r])) { deeper = true; break; }
             }
+            if (!deeper) { currentEl = candidates[q]; break; }
+        }
+        /* 策略 2（回退）：某些主题当前页也是 <a>，但带 current/active/selected class。
+         * 仅当策略 1 没找到时启用，且只取第一个。 */
+        if (!currentEl) {
+            var cls = content.querySelectorAll(
+                'a.current, a.active, a.selected, .current, .active, .selected, .pager-current-link');
+            for (var m = 0; m < cls.length; m++) {
+                var cst = (cls[m].textContent || '').replace(/\s|\u00a0/g, '');
+                if (/^\[?\d+[-–]\d+\]?$/.test(cst) && isPagerContext(cls[m])) { currentEl = cls[m]; break; }
+            }
+        }
+        if (currentEl) {
+            /* 去掉原生方括号（如 [1-100] → 1-100），只改文本不碰样式 */
+            if (/[\[\]【】［］]/.test(currentEl.textContent || '')) {
+                currentEl.textContent = currentEl.textContent.replace(/\s|\u00a0/g, '')
+                                                            .replace(/[\[\]【】［］]/g, '');
+            }
+            applyPill(currentEl);
         }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.36] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.37] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
@@ -947,7 +965,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.36] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.37] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -1019,7 +1037,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
      * 在没配好静默更新时完全无感知。检测结果按日期缓存，一天只查一次。
      * ========================================================== */
     var UPDATE_URL = 'https://raw.githubusercontent.com/ljp801005-tech/hdwing-clean-theme/main/hdwing-ssd-theme.user.js';
-    var LOCAL_VERSION = '2.36.0';
+    var LOCAL_VERSION = '2.37.0';
 
     function cmpVer(a, b) {
         var x = String(a).split('.'), y = String(b).split('.');
