@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         hdchina清爽主题
 // @namespace    https://hdwing.org/
-// @version      2.21.0
-// @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区等其他页面同样生效。
+// @version      2.30.0
+// @description  hdchina清爽主题：全站白底、蓝色导航条、置顶淡蓝行、清晰网格。候选区/求种区/字幕页同样生效。
 // @author       WorkBuddy
 // @match        https://hdwing.org/*
 // @match        http://hdwing.org/*
@@ -54,6 +54,7 @@
     var enabled    = get('enabled', '1') === '1';
     var stickyHead = get('stickyHead', '0') === '1';
     var compact    = get('compact', '1') === '1';
+    var fadeIn     = get('fadeIn', '1') === '1';
 
     /* ============================================================
      * 首帧防闪：脚本一执行就把画布刷白，
@@ -99,6 +100,13 @@
         return `
 /* ===== HDWinG SSD主题 v2.0（按SSD真实界面重写） ===== */
 
+${fadeIn ? `
+/* 渐进渲染淡入：种子行分批到达时先隐藏整个表格，等稳定后一次性淡入，
+ * 避免"表格从2697px长到6776px、下方内容被一次次顶下去"的生长抖动 */
+.torrent_list { opacity: 0 !important; }
+body.ssd-table-ready .torrent_list { opacity: 1 !important; transition: opacity .28s ease !important; }
+` : ''}
+
 /* ---------- 全局：白底 ---------- */
 html, body {
     background: ${C.pageBg} !important;
@@ -121,9 +129,9 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 /* ---------- 顶部用户信息区：只改颜色，不动尺寸定位 ---------- */
 .headerbox { background: ${C.pageBg} !important; }
 #site_header {
-    background: ${C.pageBg} !important;
-    background-image: none !important;
-    border-bottom: none !important;
+    background: #f5f5f5 url(/styles/images/logo_back.png) !important;
+    background-image: url(/styles/images/logo_back.png) !important;
+    border-bottom: 4px solid #ffffff !important;
     box-shadow: none !important;
 }
 .site_logo { filter: none !important; }
@@ -141,10 +149,10 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 /* ---------- 顶部功能按钮（捐赠/签到/21点/菠萝）：白底圆角胶囊 ---------- */
 .label {
     color: #4a4a4a !important;
-    border-radius: 999px !important;
-    padding: 2px 10px !important;
-    font-weight: normal !important;
-    line-height: 1.7 !important;
+    border-radius: .25em !important;
+    padding: .2em .6em .3em !important;
+    font-weight: bold !important;
+    line-height: 1 !important;
 }
 .label-default, .label-info, .label-success, .label-warning,
 .label-primary, .label-danger {
@@ -162,7 +170,6 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 #site_header img,
 .userinfo img, .userinforb img, .userinfort img, .user_box img {
     border-radius: 50% !important;
-    object-fit: cover;
 }
 
 /* ---------- 消除页头与蓝条之间的缝隙（只清边距，不动定位） ---------- */
@@ -171,14 +178,14 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 .nav_center { margin-top: 0 !important; margin-bottom: 0 !important; }
 /* ---------- 断层根因：页头内所有容器先统一清为白底 ---------- */
 /*（灰蓝横带就是页头里某个容器的原生底色，这里全部压掉） */
-.headerbox div:not(.site_logo), .headerbox span:not(.loadbarbg), .headerbox p,
+.headerbox div:not(.site_logo):not(#site_header), .headerbox span:not(.loadbarbg), .headerbox p,
 .headerbox table, .headerbox tbody, .headerbox tr,
 .headerbox td, .headerbox th, .headerbox ul, .headerbox li {
     background-color: transparent !important;
     background-image: none !important;
 }
 .headerbox { background-color: #ffffff !important; }
-#site_header { background-color: #ffffff !important; }
+#site_header { background-color: #f5f5f5 !important; }
 /* logo 保持站点原图，不受上面清除影响 */
 .site_logo {
     background-image: url(/styles/images/logo_hdchina.png) !important;
@@ -190,6 +197,15 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
 .user_box { background-color: #f2f2f2 !important; }
 
 /* ---------- 主导航：SSD 蓝（在上面的清白之后执行，确保生效） ---------- */
+/* 只改颜色、保留原版尺寸：#site_nav 原生 padding:10px 0 0 0，整个容器铺成 SSD 蓝后，
+ * 那 10px padding 露出的是蓝色而非灰蓝底，横带自然消失，同时和原版布局完全一致。
+ * （v2.27：不再动 padding/height，避免把页头"拉升"变形） */
+#site_nav {
+    background-color: ${C.navBg} !important;
+    background-image: none !important;
+    padding: 10px 0 0 0 !important;
+    border-bottom: none !important;
+}
 /* 清掉导航区残留背景图（渐变条/分隔线图） */
 .nav_center, .nav_center *,
 .nav_first, .nav_left, .nav_right { background-image: none !important; }
@@ -203,11 +219,13 @@ a:hover { color: ${C.link} !important; text-decoration: underline !important; }
     font-weight: bold !important;
     border-radius: 0 !important;
 }
-.nav_center a:hover { background: ${C.navBgHover} !important; color: #fff !important; text-decoration: none !important; }
+.nav_center a:hover { background: rgba(255, 255, 255, .14) !important; color: #fff !important; text-decoration: none !important; }
+/* 当前页菜单项：不再用深蓝方块（会破坏连续蓝条），改为透明融入 + 底部白线标记 */
 a.nav_item_active, a.nav_item_active:link, a.nav_item_active:visited, a.nav_item_active:hover {
-    background: ${C.navActive} !important;
+    background: transparent !important;
     color: #ffffff !important;
     text-decoration: none !important;
+    box-shadow: inset 0 -3px 0 rgba(255, 255, 255, .95) !important;
 }
 
 /* ---------- 搜索箱：白底灰框（SSD 式） ---------- */
@@ -262,8 +280,11 @@ ${compact ? `
 .torrent_list td { font-size: 12.5px !important; padding: 6px 8px !important; }
 `}
 
-/* 列宽分配：标题列吃掉剩余空间，数值列压窄（SSD 式紧凑） */
-.torrent_list { table-layout: auto !important; }
+/* 表格自适应（已取消固定表格）：宽标题列 + 数值列自然排布，
+ * 窗口缩放时表格跟随容器，不会出现标题被挤成竖排的变形。
+ * 标题列给 420px 下限，保证长标题有基本阅读空间，窄屏时整表横向滚动由站点处理 */
+.torrent_list { table-layout: auto !important; width: 100% !important; }
+.torrent_list td.t_name { min-width: 420px !important; }
 
 /* 关键：压掉 HDWinG 原生促销底，行底色只由"是否置顶"决定 */
 .torrent_list tr.free_bg,
@@ -471,6 +492,20 @@ table.table_forums table.topic_control td {
     background-color: #ffffff !important;
 }
 #site_content table.forums_viewtopic td { border: 1px ${C.innerBorder} solid !important; }
+/* 论坛帖子正文 / 公告详情区：链接恢复 HDWinG 原版深蓝灰，不被全局 SSD 蓝染色。
+ * 只作用于正文里的链接，不影响种子列表/导航/菜单等其他蓝色链接 */
+#site_content table.forums_viewtopic td.body_box a,
+#site_content table.forums_viewtopic td.body_box div.forumtext a,
+#site_content div.forumtext a,
+.announcebox a {
+    color: #3b4256 !important;
+}
+#site_content table.forums_viewtopic td.body_box a:hover,
+#site_content table.forums_viewtopic td.body_box div.forumtext a:hover,
+#site_content div.forumtext a:hover,
+.announcebox a:hover {
+    color: #2b3547 !important;
+}
 /* 控制面板左侧菜单：浅底蓝字，选中项灰底+蓝左条（SSD 式） */
 ul.menu li a {
     background-color: #f2f4f7 !important;
@@ -541,6 +576,10 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         if (el.classList && (el.classList.contains('site_logo') ||
             el.classList.contains('loadbar') || el.classList.contains('loadbarbg'))) return;
         if (nav && (el === nav || nav.contains(el))) return;
+        /* #site_nav 是导航条容器，必须保持蓝色，不能被清白 */
+        if (el.id === 'site_nav' || (el.closest && el.closest('#site_nav'))) return;
+        /* #site_header 的 logo_back 浅灰纹理是要保留的背景，不能被清白 */
+        if (el.id === 'site_header') return;
         if (el.closest && el.closest('.torrent_list')) return;
         if (isGrayBg(el)) {
             el.style.setProperty('background-color', '#ffffff', 'important');
@@ -569,6 +608,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
             for (var i = 0; i < batch.length; i++) {
                 try { purgeGrayBands(batch[i]); } catch (e) {}
             }
+            try { fixSubtitles(); } catch (e) {}
         }
         var mo = new MutationObserver(function (records) {
             for (var i = 0; i < records.length; i++) {
@@ -721,10 +761,39 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
 
         /* 诊断日志：不出效果时按 F12 看 Console */
         try {
-            console.log('[hdchina清爽主题 v2.21] 投票列修复:', voteFixed,
+            console.log('[hdchina清爽主题 v2.30] 投票列修复:', voteFixed,
                 '| 灰底清除:', grayCleared, '| 标题框恢复:', headersFixed, '| 分页修复:', pagerFixed,
                 voteFixed === 0 ? '| 投票列实际文本样本: ' + (voteSamples.join(' / ') || '无') : '');
         } catch (e) {}
+    }
+
+    /* ============================================================
+     * 字幕页 subtitles.php：清除隔行插色
+     * 该页列表用灰蓝斑马纹，颜色家族不在通用灰蓝判定内，
+     * 这里按页面直接把所有数据行压白，表头保留浅灰，悬停极淡蓝
+     * ========================================================== */
+    function fixSubtitles() {
+        if (!enabled || location.pathname.indexOf('subtitles.php') === -1) return;
+        var tables = document.querySelectorAll('table');
+        for (var i = 0; i < tables.length; i++) {
+            var rows = tables[i].querySelectorAll('tr');
+            for (var r = 0; r < rows.length; r++) {
+                var tr = rows[r];
+                var head = /colhead/i.test(tr.className || '') || !!tr.querySelector('td.colhead, th');
+                tr.style.setProperty('background-color', head ? C.headerBg : '#ffffff', 'important');
+                tr.style.setProperty('background-image', 'none', 'important');
+                var cells = tr.querySelectorAll('td, th');
+                for (var c = 0; c < cells.length; c++) {
+                    var cell = cells[c];
+                    if (cell.tagName === 'TH' || /colhead/i.test(cell.className || '')) {
+                        cell.style.setProperty('background-color', C.headerBg, 'important');
+                    } else {
+                        cell.style.setProperty('background-color', '#ffffff', 'important');
+                        cell.style.setProperty('background-image', 'none', 'important');
+                    }
+                }
+            }
+        }
     }
 
     /* ============================================================
@@ -760,24 +829,64 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         } catch (e) {}
     }
 
+    /* 渐进渲染淡入：等种子表行数连续多轮不再增长，且表格高度稳定后，
+     * 才给 body 加 class 让表格淡入。用户看到的是一次性出现的完整表格，
+     * 而不是分批生长、下方内容被顶下去的抖动。
+     * 仅在种子列表页启用；有超时兜底，绝不无限隐藏。 */
+    function waitTableStable() {
+        if (location.pathname.indexOf('torrents.php') === -1) {
+            document.body && document.body.classList.add('ssd-table-ready');
+            return;
+        }
+        var stableCount = 0;
+        var lastRows = -1;
+        var lastH = -1;
+        var startAt = Date.now();
+        var iv = setInterval(function () {
+            var tbl = document.querySelector('.torrent_list');
+            var done = false;
+            if (!tbl) {
+                /* 表格还没出现：等，但 1.5s 后无论如何放行 */
+                if (Date.now() - startAt > 1500) done = true;
+            } else {
+                var rows = tbl.querySelectorAll('tbody tr').length;
+                var h = tbl.offsetHeight;
+                if (rows === lastRows && h === lastH && rows > 0) stableCount++;
+                else stableCount = 0;
+                lastRows = rows;
+                lastH = h;
+                /* 连续 3 轮（约 240ms）稳定，或页面 complete 后行稳定 2 轮，或硬超时 3s */
+                if (stableCount >= 3 ||
+                    (document.readyState === 'complete' && stableCount >= 2) ||
+                    Date.now() - startAt > 3000) done = true;
+            }
+            if (done) {
+                clearInterval(iv);
+                document.body && document.body.classList.add('ssd-table-ready');
+            }
+        }, 80);
+    }
+
     function boot() {
         apply();
         placeStyle();
         purgeGrayBands();
         fixOffersAndPager();
+        fixSubtitles();
         /* 早期多轮补扫：首帧后立刻把残留灰蓝压掉，避免闪一下 */
         var delays = [16, 60, 150, 320, 700, 1200];
         for (var d = 0; d < delays.length; d++) {
             (function (t) {
                 setTimeout(function () {
                     purgeGrayBands();
-                    if (t <= 320) fixOffersAndPager();
+                    if (t <= 320) { fixOffersAndPager(); fixSubtitles(); }
                     if (t <= 700) placeStyle();
                 }, t);
             })(delays[d]);
         }
         watchDom();
         watchLayout();
+        if (fadeIn) waitTableStable();
         /* 解析期间每 8ms 重新落位一次样式（同容器时是空操作，开销可忽略）。
          * 不依赖 DOM 监听回调时机——单页 HTML 可能一次性解析完，回调要到结束才触发 */
         var pt = setInterval(function () {
@@ -790,7 +899,7 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
                 var st = document.getElementById('ssd-theme-style');
                 var pos = st && st.parentNode === document.body ? 'body末尾'
                         : st && st.parentNode === document.head ? 'head末尾' : 'html开头';
-                console.log('[hdchina清爽主题 v2.21] 首帧 ' + since() + 'ms，样式位置：' + pos);
+                console.log('[hdchina清爽主题 v2.30] 首帧 ' + since() + 'ms，样式位置：' + pos);
             } catch (e) {}
         });
     }
@@ -818,6 +927,11 @@ button, input[type=submit], input[type=button] { cursor: pointer; }
         GM_registerMenuCommand(stickyHead ? '📌 表头吸顶：开（点击关闭）' : '📌 表头吸顶：关（点击开启）', function () {
             stickyHead = !stickyHead;
             set('stickyHead', stickyHead ? '1' : '0');
+            location.reload();
+        });
+        GM_registerMenuCommand(fadeIn ? '✨ 淡入防抖：开（点击关闭）' : '✨ 淡入防抖：关（点击开启）', function () {
+            fadeIn = !fadeIn;
+            set('fadeIn', fadeIn ? '1' : '0');
             location.reload();
         });
     }
